@@ -22,9 +22,27 @@ impl From<Delimiter> for GroupKind {
     }
 }
 
+impl From<GroupKind> for Delimiter {
+    fn from(g: GroupKind) -> Self {
+        match g {
+            GroupKind::Paren => Self::Parenthesis,
+            GroupKind::Brace => Self::Brace,
+            GroupKind::Bracket => Self::Bracket,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Group {
     pub kind: GroupKind,
     pub inner: TokenStream,
+}
+
+#[cfg(feature = "quote")]
+impl quote::ToTokens for Group {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        crate::procmacro::Group::from(self.clone()).to_tokens(stream)
+    }
 }
 
 impl From<crate::procmacro::Group> for Group {
@@ -42,6 +60,15 @@ impl From<&crate::procmacro::Group> for Group {
             kind: g.delimiter().into(),
             inner: g.stream(),
         }
+    }
+}
+
+impl From<Group> for crate::procmacro::Group {
+    fn from(g: Group) -> Self {
+        Self::new(
+            g.kind.into(),
+            g.inner,
+        )
     }
 }
 
@@ -253,6 +280,14 @@ impl fmt::Display for Ident<'_> {
     }
 }
 
+#[cfg(feature = "quote")]
+impl quote::ToTokens for Ident<'_> {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        use quote::TokenStreamExt;
+        stream.append(proc_macro2::Ident::new(self.0, proc_macro2::Span::call_site()));
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Punct(pub char);
 
@@ -291,6 +326,14 @@ impl MatchStream for Punct {
 impl fmt::Display for Punct {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(feature = "quote")]
+impl quote::ToTokens for Punct {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        use quote::TokenStreamExt;
+        stream.append(proc_macro2::Punct::new(self.0, proc_macro2::Spacing::Alone));
     }
 }
 
@@ -335,6 +378,15 @@ impl fmt::Display for Literal<'_> {
     }
 }
 
+#[cfg(feature = "quote")]
+impl quote::ToTokens for Literal<'_> {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        use quote::TokenStreamExt;
+        use core::str::FromStr;
+        stream.append(proc_macro2::Literal::from_str(self.0).expect("invalid literal"));
+    }
+}
+
 pub mod punct {
     use crate::{FromStream, MatchStream, StreamLike, StreamView, Stream, Error};
     use crate::procmacro::TokenTree;
@@ -376,6 +428,14 @@ pub mod punct {
                     } else {
                         Err(Some(tok.to_string()))
                     }
+                }
+            }
+
+            #[cfg(feature = "quote")]
+            impl quote::ToTokens for $name {
+                fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
+                    use quote::TokenStreamExt;
+                    stream.append(proc_macro2::Punct::new($p, proc_macro2::Spacing::Alone));
                 }
             }
 

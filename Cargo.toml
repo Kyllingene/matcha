@@ -5,8 +5,11 @@ edition = "2024"
 
 [dependencies]
 proc-macro2 = { version = "1.0.106", optional = true }
+quote = { version = "1.0.45", optional = true }
 
 [features]
-default = ["proc-macro2-span-locations"]
+default = ["proc-macro2-span-locations", "quote"]
+
+quote = ["dep:quote", "dep:proc-macro2"]
 proc-macro2 = ["dep:proc-macro2"]
 proc-macro2-span-locations = ["proc-macro2", "proc-macro2/span-locations"]
