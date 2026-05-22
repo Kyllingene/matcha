@@ -106,7 +106,7 @@ pub trait DiagDisplay {
     /// See [`core::fmt::Display::fmt`].
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result;
 
-    /// See [`core::str::ToString::to_string`].
+    /// See [`ToString::to_string`].
     fn diag_string(&self) -> String {
         use core::fmt::Write;
 
