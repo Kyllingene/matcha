@@ -37,8 +37,15 @@ pub trait MatchStream {
 pub trait StreamLike {
     fn peek(&mut self) -> Option<&TokenTree>;
     fn peek_nth(&mut self, n: usize) -> Option<&TokenTree>;
+    fn peek_last(&mut self) -> Option<&TokenTree>;
     fn peek_many(&mut self, n: usize) -> &[TokenTree];
     fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree];
+
+    fn stringify(&mut self) -> String;
+
+    fn is_empty(&mut self) -> bool {
+        self.peek().is_none()
+    }
 
     fn view(&mut self) -> StreamView<'_, Self>
     where Self: Sized,
@@ -95,6 +102,11 @@ impl Stream {
         self.buffer.get(n)
     }
 
+    pub fn peek_last(&mut self) -> Option<&TokenTree> {
+        self.pull(usize::MAX);
+        self.buffer.back()
+    }
+
     pub fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.peek_many_at(n, 0)
     }
@@ -129,6 +141,17 @@ impl Stream {
         } else {
             self.buffer.drain(..n);
         }
+    }
+
+    pub fn stringify(&mut self) -> String {
+        self.pull(usize::MAX);
+
+        let mut s = String::new();
+        for tt in &self.buffer {
+            if !s.is_empty() { s.push(' '); }
+            s.push_str(&tt.to_string());
+        }
+        s
     }
 
     pub fn view(&mut self) -> StreamView<'_, Self> {
@@ -175,6 +198,10 @@ impl<S: StreamLike> StreamView<'_, S> {
         self.stream.peek_nth(n + self.skip)
     }
 
+    pub fn peek_last(&mut self) -> Option<&TokenTree> {
+        self.stream.peek_last()
+    }
+
     pub fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.stream.peek_many_at(n, self.skip)
     }
@@ -190,6 +217,10 @@ impl<S: StreamLike> StreamView<'_, S> {
         }
     }
 
+    pub fn stringify(&mut self) -> String {
+        self.stream.stringify()
+    }
+
     pub fn view_from(&mut self, skip: usize) -> StreamView<'_, Self> {
         StreamView { stream: self, skip }
     }
@@ -202,11 +233,17 @@ impl StreamLike for Stream {
     fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
         self.peek_nth(n)
     }
+    fn peek_last(&mut self) -> Option<&TokenTree> {
+        self.peek_last()
+    }
     fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.peek_many(n)
     }
     fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
         self.peek_many_at(n, at)
+    }
+    fn stringify(&mut self) -> String {
+        self.stringify()
     }
 }
 
@@ -217,10 +254,16 @@ impl<S: StreamLike> StreamLike for StreamView<'_, S> {
     fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
         self.peek_nth(n)
     }
+    fn peek_last(&mut self) -> Option<&TokenTree> {
+        self.peek_last()
+    }
     fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.peek_many(n)
     }
     fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
         self.peek_many_at(n, at)
+    }
+    fn stringify(&mut self) -> String {
+        self.stringify()
     }
 }

@@ -5,7 +5,7 @@ mod stream;
 mod utils;
 
 pub use stream::{Error, FromStream, MatchStream, Stream, StreamLike, StreamView};
-pub use utils::{Group, GroupKind, Ident, Literal, Punct, Parens, Braces, Brackets};
+pub use utils::{Group, GroupKind, Ident, Literal, Punct, Parens, Braces, Brackets, Delimited, Greedy, punct};
 
 #[macro_export]
 macro_rules! decompose {
@@ -72,7 +72,13 @@ macro_rules! decompose {
                 Err(s) => panic!("expected `{}`, found `{s}`", $eq_expr),
             }
         )?
-    )+};
+
+    )+
+
+        if !$input_stream.is_empty() {
+            panic!("unexpected input: `{}`", $input_stream.stringify());
+        }
+    };
 
     (
         $input_stream:expr;
