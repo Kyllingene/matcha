@@ -13,3 +13,6 @@ default = ["proc-macro2-span-locations", "quote"]
 quote = ["dep:quote", "dep:proc-macro2"]
 proc-macro2 = ["dep:proc-macro2"]
 proc-macro2-span-locations = ["proc-macro2", "proc-macro2/span-locations"]
+
+[lints.rust]
+missing_docs = "warn"

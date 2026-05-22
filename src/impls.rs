@@ -1,10 +1,10 @@
-use crate::{Error, FromStream, MatchStream, Stream, StreamLike, StreamView};
 use crate::procmacro::TokenTree;
+use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
 
 impl FromStream for TokenTree {
     type Output = Self;
     fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-        stream.pop().ok_or(Error::EndOfStream)
+        stream.pop().ok_or(stream.err_eos(ErrorText::Token))
     }
 }
 
@@ -14,11 +14,9 @@ impl MatchStream for TokenTree {
         S: StreamLike,
     {
         match (self, stream.peek().ok_or(None)?) {
-            (TokenTree::Group(lhs), TokenTree::Group(rhs)) => {
-                (lhs.to_string() == rhs.to_string())
-                    .then_some(1)
-                    .ok_or_else(|| Some(rhs.to_string()))
-            }
+            (TokenTree::Group(lhs), TokenTree::Group(rhs)) => (lhs.to_string() == rhs.to_string())
+                .then_some(1)
+                .ok_or_else(|| Some(rhs.to_string())),
             (TokenTree::Ident(lhs), TokenTree::Ident(rhs)) => {
                 #[cfg(feature = "proc-macro2")]
                 {
@@ -34,16 +32,13 @@ impl MatchStream for TokenTree {
                         .ok_or_else(|| Some(rhs.to_string()))
                 }
             }
-            (TokenTree::Punct(lhs), TokenTree::Punct(rhs)) => {
-                (lhs.to_string() == rhs.to_string())
-                    .then_some(1)
-                    .ok_or_else(|| Some(rhs.to_string()))
-            }
-            (TokenTree::Literal(lhs), TokenTree::Literal(rhs)) => {
-                (lhs.to_string() == rhs.to_string())
-                    .then_some(1)
-                    .ok_or_else(|| Some(rhs.to_string()))
-            }
+            (TokenTree::Punct(lhs), TokenTree::Punct(rhs)) => (lhs.to_string() == rhs.to_string())
+                .then_some(1)
+                .ok_or_else(|| Some(rhs.to_string())),
+            (TokenTree::Literal(lhs), TokenTree::Literal(rhs)) => (lhs.to_string()
+                == rhs.to_string())
+            .then_some(1)
+            .ok_or_else(|| Some(rhs.to_string())),
             (_, rhs) => Err(Some(rhs.to_string())),
         }
     }

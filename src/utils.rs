@@ -1,14 +1,15 @@
-use crate::{Error, FromStream, MatchStream, Stream, StreamLike, StreamView};
 use crate::procmacro::{Delimiter, TokenStream, TokenTree};
+use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
 use core::fmt;
 
+/// The delimiters used by a [`Group`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupKind {
-    // A group delimited by `()`.
+    /// A group delimited by `()`.
     Paren,
-    // A group delimited by `{}`.
+    /// A group delimited by `{}`.
     Brace,
-    // A group delimited by `[]`.
+    /// A group delimited by `[]`.
     Bracket,
 }
 
@@ -32,9 +33,12 @@ impl From<GroupKind> for Delimiter {
     }
 }
 
+/// A group of tokens.
 #[derive(Debug, Clone)]
 pub struct Group {
+    /// The delimiters.
     pub kind: GroupKind,
+    /// The inner tokens, not including the delimiters.
     pub inner: TokenStream,
 }
 
@@ -42,15 +46,18 @@ pub struct Group {
 impl quote::ToTokens for Group {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         #[cfg(feature = "proc-macro2")]
-        { crate::procmacro::Group::from(self.clone()).to_tokens(stream) }
+        {
+            crate::procmacro::Group::from(self.clone()).to_tokens(stream)
+        }
         #[cfg(not(feature = "proc-macro2"))]
-        { 
+        {
             let delimiter = match self.kind {
                 GroupKind::Paren => proc_macro2::Delimiter::Parenthesis,
                 GroupKind::Brace => proc_macro2::Delimiter::Brace,
                 GroupKind::Bracket => proc_macro2::Delimiter::Bracket,
             };
-            proc_macro2::Group::new(delimiter, self.inner.clone().into()).to_tokens(stream) }
+            proc_macro2::Group::new(delimiter, self.inner.clone().into()).to_tokens(stream)
+        }
     }
 }
 
@@ -74,24 +81,26 @@ impl From<&crate::procmacro::Group> for Group {
 
 impl From<Group> for crate::procmacro::Group {
     fn from(g: Group) -> Self {
-        Self::new(
-            g.kind.into(),
-            g.inner,
-        )
+        Self::new(g.kind.into(), g.inner)
     }
 }
 
 impl FromStream for Group {
     type Output = Self;
     fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Plain("(, [, or {".into())));
+            }
+        };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok {
             Ok(g.into())
         } else {
-            return Err(Error::Expected {
-                expected: Some("(, [, or {".into()),
-                got: Some(tok.to_string()),
+            return Err(Error {
+                expected: ErrorText::Plain("`(`, `[`, or `{`".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: span,
             });
         };
@@ -108,10 +117,10 @@ impl MatchStream for Group {
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Group(g) = tok {
-            (
-                GroupKind::from(g.delimiter()) == self.kind
-                    && g.stream().to_string() == self.inner.to_string()
-            ).then_some(1).ok_or_else(|| Some(g.to_string()))
+            (GroupKind::from(g.delimiter()) == self.kind
+                && g.stream().to_string() == self.inner.to_string())
+            .then_some(1)
+            .ok_or_else(|| Some(g.to_string()))
         } else {
             Err(Some(tok.to_string()))
         }
@@ -128,14 +137,22 @@ impl fmt::Display for Group {
     }
 }
 
+/// A helper for parsing a [`Group`] with [`GroupKind::Paren`].
 pub struct Parens;
+/// A helper for parsing a [`Group`] with [`GroupKind::Brace`].
 pub struct Braces;
+/// A helper for parsing a [`Group`] with [`GroupKind::Bracket`].
 pub struct Brackets;
 
 impl FromStream for Parens {
     type Output = Group;
     fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Backticks("(".into())));
+            }
+        };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
             && g.delimiter() == Delimiter::Parenthesis
@@ -145,9 +162,9 @@ impl FromStream for Parens {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Expected {
-                expected: Some("(".into()),
-                got: Some(tok.to_string()),
+            return Err(Error {
+                expected: ErrorText::Backticks("(".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: span,
             });
         };
@@ -160,7 +177,12 @@ impl FromStream for Parens {
 impl FromStream for Braces {
     type Output = Group;
     fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Backticks("{".into())));
+            }
+        };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
             && g.delimiter() == Delimiter::Brace
@@ -170,9 +192,9 @@ impl FromStream for Braces {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Expected {
-                expected: Some("{".into()),
-                got: Some(tok.to_string()),
+            return Err(Error {
+                expected: ErrorText::Backticks("{".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: span,
             });
         };
@@ -185,7 +207,12 @@ impl FromStream for Braces {
 impl FromStream for Brackets {
     type Output = Group;
     fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Backticks("[".into())));
+            }
+        };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
             && g.delimiter() == Delimiter::Bracket
@@ -195,9 +222,9 @@ impl FromStream for Brackets {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Expected {
-                expected: Some("[".into()),
-                got: Some(tok.to_string()),
+            return Err(Error {
+                expected: ErrorText::Backticks("[".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: span,
             });
         };
@@ -207,6 +234,10 @@ impl FromStream for Brackets {
     }
 }
 
+/// A helper for parsing a series of items.
+///
+/// Parses a series of items (`T`), separated by delimiters (`D`), with an
+/// optional trailing delimiter.
 pub struct Delimited<T, D> {
     _items: core::marker::PhantomData<T>,
     _delimiter: core::marker::PhantomData<D>,
@@ -229,6 +260,9 @@ impl<T: FromStream, D: FromStream> FromStream for Delimited<T, D> {
     }
 }
 
+/// A helper for ensuring a given item is the last in the stream.
+///
+/// Errors if the stream is non-empty after parsing the item (`T`).
 pub struct Greedy<T>(core::marker::PhantomData<T>);
 
 impl<T: FromStream> FromStream for Greedy<T> {
@@ -237,9 +271,9 @@ impl<T: FromStream> FromStream for Greedy<T> {
         let item = T::from_stream(stream)?;
         if let Some(tt) = stream.peek() {
             let span = tt.span();
-            Err(Error::Expected {
-                expected: None,
-                got: Some(stream.stringify()),
+            Err(Error {
+                expected: ErrorText::EndOfStream,
+                got: ErrorText::Backticks(stream.stringify()),
                 at: span,
             })
         } else {
@@ -248,21 +282,30 @@ impl<T: FromStream> FromStream for Greedy<T> {
     }
 }
 
+/// An identifier.
+///
+/// When parsed out of a stream, returns a `'static` ident, from a leaked
+/// `String`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Ident<'a>(pub &'a str);
 
 impl FromStream for Ident<'static> {
     type Output = Self;
     fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Plain("ident".into())));
+            }
+        };
         if let TokenTree::Ident(i) = tok {
             let s = i.to_string().leak();
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error::Expected {
-                expected: Some("<identifier>".into()),
-                got: Some(tok.to_string()),
+            Err(Error {
+                expected: ErrorText::Plain("ident".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: tok.span(),
             })
         }
@@ -276,7 +319,9 @@ impl MatchStream for Ident<'_> {
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Ident(i) = tok {
-            (&*i.to_string() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
+            (&*i.to_string() == self.0)
+                .then_some(1)
+                .ok_or_else(|| Some(tok.to_string()))
         } else {
             Err(Some(tok.to_string()))
         }
@@ -293,25 +338,36 @@ impl fmt::Display for Ident<'_> {
 impl quote::ToTokens for Ident<'_> {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         use quote::TokenStreamExt;
-        stream.append(proc_macro2::Ident::new(self.0, proc_macro2::Span::call_site()));
+        stream.append(proc_macro2::Ident::new(
+            self.0,
+            proc_macro2::Span::call_site(),
+        ));
     }
 }
 
+/// A piece of punctuation (e.g. `!`, `.`, `:`).
+///
+/// See also [`punct`] for helpers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Punct(pub char);
 
 impl FromStream for Punct {
     type Output = Self;
     fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Plain("punctuation".into())));
+            }
+        };
         if let TokenTree::Punct(p) = tok {
             let c = p.as_char();
             stream.pop();
             Ok(Self(c))
         } else {
-            Err(Error::Expected {
-                expected: Some("<punctuation>".into()),
-                got: Some(tok.to_string()),
+            Err(Error {
+                expected: ErrorText::Plain("punctuation".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: tok.span(),
             })
         }
@@ -325,7 +381,9 @@ impl MatchStream for Punct {
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Punct(p) = tok {
-            (p.as_char() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
+            (p.as_char() == self.0)
+                .then_some(1)
+                .ok_or_else(|| Some(tok.to_string()))
         } else {
             Err(Some(tok.to_string()))
         }
@@ -346,21 +404,27 @@ impl quote::ToTokens for Punct {
     }
 }
 
+/// A piece of punctuation (e.g. `123`, `bool`, `"foo"`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Literal<'a>(pub &'a str);
 
 impl FromStream for Literal<'static> {
     type Output = Self;
     fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-        let tok = stream.peek().ok_or(Error::EndOfStream)?;
+        let tok = match stream.peek() {
+            Some(tt) => tt,
+            None => {
+                return Err(stream.err_eos(ErrorText::Plain("literal".into())));
+            }
+        };
         if let TokenTree::Literal(l) = tok {
             let s = l.to_string().leak();
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error::Expected {
-                expected: Some("<literal>".into()),
-                got: Some(tok.to_string()),
+            Err(Error {
+                expected: ErrorText::Plain("literal".into()),
+                got: ErrorText::Backticks(tok.to_string()),
                 at: tok.span(),
             })
         }
@@ -374,7 +438,9 @@ impl MatchStream for Literal<'_> {
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Literal(l) = tok {
-            (&*l.to_string() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
+            (&*l.to_string() == self.0)
+                .then_some(1)
+                .ok_or_else(|| Some(tok.to_string()))
         } else {
             Err(Some(tok.to_string()))
         }
@@ -390,36 +456,47 @@ impl fmt::Display for Literal<'_> {
 #[cfg(feature = "quote")]
 impl quote::ToTokens for Literal<'_> {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
-        use quote::TokenStreamExt;
         use core::str::FromStr;
+        use quote::TokenStreamExt;
         stream.append(proc_macro2::Literal::from_str(self.0).expect("invalid literal"));
     }
 }
 
+/// Helpers for parsing specific [`Punct`]s.
 pub mod punct {
-    use crate::{FromStream, MatchStream, StreamLike, StreamView, Stream, Error};
     use crate::procmacro::TokenTree;
+    use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
     use core::fmt;
 
     macro_rules! impl_punct {
         ($(
-            $name:ident: $p:literal
+            $name:ident: $p:literal = $doc:literal
         ),+ $(,)?) => {$(
+            #[doc = concat!(
+                "A helper for parsing ",
+                $doc,
+                " into a [`Punct`](crate::Punct).",
+            )]
             #[derive(Debug, Clone, Copy, PartialEq, Eq)]
             pub struct $name;
 
             impl FromStream for $name {
                 type Output = Self;
                 fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
-                    let tok = stream.peek().ok_or(Error::EndOfStream)?;
+                    let tok = match stream.peek() {
+                        Some(tt) => tt,
+                        None => {
+                            return Err(stream.err_eos(ErrorText::Backticks($p.to_string())));
+                        }
+                    };
                     if let TokenTree::Punct(p) = tok
                         && p.as_char() == $p {
                         stream.pop();
                         Ok(Self)
                     } else {
-                        Err(Error::Expected {
-                            expected: Some($p.to_string()),
-                            got: Some(tok.to_string()),
+                        Err(Error {
+                            expected: ErrorText::Backticks($p.to_string()),
+                            got: ErrorText::Backticks(tok.to_string()),
                             at: tok.span(),
                         })
                     }
@@ -457,33 +534,33 @@ pub mod punct {
     }
 
     impl_punct! {
-        Slash: '/',
-        Bar: '|',
-        Colon: ':',
-        Semicolon: ';',
-        Quote: '"',
-        Apos: '\'',
-        Comma: ',',
-        Less: '<',
-        Period: '.',
-        Greater: '>',
-        Backslash: '\\',
-        Question: '?',
+        Slash: '/' = "a slash (`/`)",
+        Bar: '|' = "a pipe (`|`)",
+        Colon: ':' = "a colon (`:`)",
+        Semicolon: ';' = "a semicolon (`;`)",
+        Quote: '"' = "a quote (`\"`)",
+        Apos: '\'' = "an apostrophe (`'`)",
+        Comma: ',' = "a comma (`,`)",
+        Less: '<' = "a left angle bracket (`<`)",
+        Period: '.' = "a period (`.`)",
+        Greater: '>' = "a right angle bracket (`>`)",
+        Backslash: '\\' = "a backslash (`\\`)",
+        Question: '?' = "a question mark (`?`)",
 
-        Tilde: '~',
-        Backtick: '`',
-        Bang: '!',
-        At: '@',
-        Hash: '#',
-        Dollar: '$',
-        Percent: '%',
-        Up: '^',
-        Amp: '&',
-        Star: '*',
+        Tilde: '~' = "a tilde (`~`)",
+        Backtick: '`' = "a backtick (`` ` ``)",
+        Bang: '!' = "an exclamation mark (`!`)",
+        At: '@' = "an at symbol (`@`)",
+        Hash: '#' = "a pound sign (`#`)",
+        Dollar: '$' = "a dollar sign (`$`)",
+        Percent: '%' = "a percent sign (`%`)",
+        Caret: '^' = "a caret (`^`)",
+        Amp: '&' = "an ampersand (`&`)",
+        Star: '*' = "an asterisk (`*`)",
 
-        Dash: '-',
-        Underscore: '_',
-        Plus: '+',
-        Equals: '=',
+        Dash: '-' = "a minus sign (`-`)",
+        Underscore: '_' = "an underscore (`_`)",
+        Plus: '+' = "a plus sign (`+`)",
+        Equals: '=' = "an equals sign (`=`)",
     }
 }
