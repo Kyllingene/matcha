@@ -16,6 +16,7 @@ pub enum Error {
 #[cfg(feature = "proc-macro2")]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        #[cfg_attr(not(feature = "proc-macro2-span-locations"), expect(unused_variables))]
         match self {
             Self::EndOfStream => write!(f, "unexpected end of input"),
             Self::Invalid(span) => {
@@ -51,14 +52,19 @@ impl core::fmt::Display for Error {
                     write!(f, "end of stream")?;
                 }
 
-                let lc = at.start();
-                write!(
-                    f,
-                    " (at {}:{}:{})",
-                    at.file(),
-                    lc.line,
-                    lc.column,
-                )
+                #[cfg(feature = "proc-macro2-span-locations")]
+                {
+                    let lc = at.start();
+                    write!(
+                        f,
+                        " (at {}:{}:{})",
+                        at.file(),
+                        lc.line,
+                        lc.column,
+                    )?;
+                }
+
+                Ok(())
             }
         }
     }
