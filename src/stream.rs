@@ -1,10 +1,16 @@
 use proc_macro::{TokenStream, TokenTree, Span};
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Error {
     EndOfStream,
     Invalid(Span),
+
+    Expected {
+        expected: Option<String>,
+        got: Option<String>,
+        at: Span,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -18,6 +24,27 @@ impl core::fmt::Display for Error {
                 span.line(),
                 span.column(),
             ),
+            Self::Expected { expected, got, at } => {
+                if let Some(s) = expected {
+                    write!(f, "expected `{s}`, got")?;
+                } else {
+                    write!(f, "expected end of stream, got")?;
+                }
+
+                if let Some(s) = got {
+                    write!(f, "`{s}`")?;
+                } else {
+                    write!(f, "end of stream")?;
+                }
+
+                write!(
+                    f,
+                    "(at {}:{}:{})",
+                    at.local_file().unwrap_or_else(|| "<...>".into()).display(),
+                    at.line(),
+                    at.column(),
+                )
+            }
         }
     }
 }
@@ -29,7 +56,7 @@ pub trait FromStream {
 }
 
 pub trait MatchStream {
-    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike;
 }

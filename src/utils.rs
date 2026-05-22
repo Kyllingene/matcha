@@ -53,7 +53,11 @@ impl FromStream for Group {
         let result = if let TokenTree::Group(g) = tok {
             Ok(g.into())
         } else {
-            return Err(Error::Invalid(span));
+            return Err(Error::Expected {
+                expected: Some("(, [, or {".into()),
+                got: Some(tok.to_string()),
+                at: span,
+            });
         };
 
         stream.pop();
@@ -62,18 +66,18 @@ impl FromStream for Group {
 }
 
 impl MatchStream for Group {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or_else(|| "<end of input>".to_string())?;
+        let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Group(g) = tok {
             (
                 GroupKind::from(g.delimiter()) == self.kind
                     && g.stream().to_string() == self.inner.to_string()
-            ).then_some(1).ok_or_else(|| g.to_string())
+            ).then_some(1).ok_or_else(|| Some(g.to_string()))
         } else {
-            return Err(tok.to_string());
+            Err(Some(tok.to_string()))
         }
     }
 }
@@ -105,7 +109,11 @@ impl FromStream for Parens {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Invalid(span));
+            return Err(Error::Expected {
+                expected: Some("(".into()),
+                got: Some(tok.to_string()),
+                at: span,
+            });
         };
 
         stream.pop();
@@ -126,7 +134,11 @@ impl FromStream for Braces {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Invalid(span));
+            return Err(Error::Expected {
+                expected: Some("{".into()),
+                got: Some(tok.to_string()),
+                at: span,
+            });
         };
 
         stream.pop();
@@ -147,7 +159,11 @@ impl FromStream for Brackets {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error::Invalid(span));
+            return Err(Error::Expected {
+                expected: Some("[".into()),
+                got: Some(tok.to_string()),
+                at: span,
+            });
         };
 
         stream.pop();
@@ -184,7 +200,12 @@ impl<T: FromStream> FromStream for Greedy<T> {
     fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
         let item = T::from_stream(stream)?;
         if let Some(tt) = stream.peek() {
-            Err(Error::Invalid(tt.span()))
+            let span = tt.span();
+            Err(Error::Expected {
+                expected: None,
+                got: Some(stream.stringify()),
+                at: span,
+            })
         } else {
             Ok(item)
         }
@@ -203,21 +224,25 @@ impl FromStream for Ident<'static> {
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error::Invalid(tok.span()))
+            Err(Error::Expected {
+                expected: Some("<identifier>".into()),
+                got: Some(tok.to_string()),
+                at: tok.span(),
+            })
         }
     }
 }
 
 impl MatchStream for Ident<'_> {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or_else(|| "<end of input>".to_string())?;
+        let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Ident(i) = tok {
-            (&*i.to_string() == self.0).then_some(1).ok_or_else(|| tok.to_string())
+            (&*i.to_string() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
         } else {
-            Err(tok.to_string())
+            Err(Some(tok.to_string()))
         }
     }
 }
@@ -240,21 +265,25 @@ impl FromStream for Punct {
             stream.pop();
             Ok(Self(c))
         } else {
-            Err(Error::Invalid(tok.span()))
+            Err(Error::Expected {
+                expected: Some("<punctuation>".into()),
+                got: Some(tok.to_string()),
+                at: tok.span(),
+            })
         }
     }
 }
 
 impl MatchStream for Punct {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or_else(|| "<end of input>".to_string())?;
+        let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Punct(p) = tok {
-            (p.as_char() == self.0).then_some(1).ok_or_else(|| tok.to_string())
+            (p.as_char() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
         } else {
-            Err(tok.to_string())
+            Err(Some(tok.to_string()))
         }
     }
 }
@@ -277,21 +306,25 @@ impl FromStream for Literal<'static> {
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error::Invalid(tok.span()))
+            Err(Error::Expected {
+                expected: Some("<literal>".into()),
+                got: Some(tok.to_string()),
+                at: tok.span(),
+            })
         }
     }
 }
 
 impl MatchStream for Literal<'_> {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or_else(|| "<end of input>".to_string())?;
+        let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Literal(l) = tok {
-            (&*l.to_string() == self.0).then_some(1).ok_or_else(|| tok.to_string())
+            (&*l.to_string() == self.0).then_some(1).ok_or_else(|| Some(tok.to_string()))
         } else {
-            Err(tok.to_string())
+            Err(Some(tok.to_string()))
         }
     }
 }
@@ -323,21 +356,25 @@ pub mod punct {
                         stream.pop();
                         Ok(Self)
                     } else {
-                        Err(Error::Invalid(tok.span()))
+                        Err(Error::Expected {
+                            expected: Some($p.to_string()),
+                            got: Some(tok.to_string()),
+                            at: tok.span(),
+                        })
                     }
                 }
             }
 
             impl MatchStream for $name {
-                fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+                fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
                 where
                     S: StreamLike,
                 {
-                    let tok = stream.peek().ok_or_else(|| "<end of input>".to_string())?;
+                    let tok = stream.peek().ok_or(None)?;
                     if let TokenTree::Punct(p) = tok {
-                        (p.as_char() == $p).then_some(1).ok_or_else(|| tok.to_string())
+                        (p.as_char() == $p).then_some(1).ok_or_else(|| Some(tok.to_string()))
                     } else {
-                        Err(tok.to_string())
+                        Err(Some(tok.to_string()))
                     }
                 }
             }

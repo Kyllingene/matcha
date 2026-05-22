@@ -16,15 +16,12 @@ macro_rules! decompose {
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
 
-            $( = $bind_name:ident $bind_type:ty )?
+            $( = $bind_name:pat = $bind_type:ty )?
             $( > $eq_expr:expr )?
         ),+
     ) => {$(
         $(
-            let group = match $crate::Parens::from_stream(&mut $input_stream) {
-                Ok(x) => x,
-                Err(e) => panic!("{e}"),
-            };
+            let group = $crate::Parens::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::decompose! {
                 stream;
@@ -34,10 +31,7 @@ macro_rules! decompose {
         )?
 
         $(
-            let group = match $crate::Braces::from_stream(&mut $input_stream) {
-                Ok(x) => x,
-                Err(e) => panic!("{e}"),
-            };
+            let group = $crate::Braces::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::decompose! {
                 stream;
@@ -47,10 +41,7 @@ macro_rules! decompose {
         )?
 
         $(
-            let group = match $crate::Brackets::from_stream(&mut $input_stream) {
-                Ok(x) => x,
-                Err(e) => panic!("{e}"),
-            };
+            let group = $crate::Brackets::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::decompose! {
                 stream;
@@ -60,23 +51,32 @@ macro_rules! decompose {
         )?
 
         $(
-            let $bind_name = match <$bind_type as $crate::FromStream>::from_stream(&mut $input_stream) {
-                Ok(x) => x,
-                Err(e) => panic!("{e}"),
-            };
+            let $bind_name = <$bind_type as $crate::FromStream>::from_stream(&mut $input_stream)?;
         )?
 
         $(
+            let span = $input_stream.peek().map(|tt| tt.span()).unwrap_or(::proc_macro::Span::call_site());
             match <_ as $crate::MatchStream>::match_stream(&$eq_expr, $input_stream.view()) {
                 Ok(n) => $input_stream.skip(n),
-                Err(s) => panic!("expected `{}`, found `{s}`", $eq_expr),
+                Err(s) => {
+                    return Err($crate::Error::Expected {
+                        expected: Some($eq_expr.to_string()),
+                        got: s,
+                        at: span,
+                    });
+                }
             }
         )?
 
     )+
 
-        if !$input_stream.is_empty() {
-            panic!("unexpected input: `{}`", $input_stream.stringify());
+        if let Some(tt) = $input_stream.peek() {
+            let span = tt.span();
+            return Err($crate::Error::Expected {
+                expected: None,
+                got: Some($input_stream.stringify()),
+                at: span,
+            });
         }
     };
 
@@ -87,7 +87,7 @@ macro_rules! decompose {
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
 
-            $( = $bind_name:ident $bind_type:ty )?
+            $( = $bind_name:pat = $bind_type:ty )?
             $( > $eq_expr:expr )?
         ),+ ,
     ) => {

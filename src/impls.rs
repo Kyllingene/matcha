@@ -9,32 +9,32 @@ impl FromStream for TokenTree {
 }
 
 impl MatchStream for TokenTree {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
-        match (self, stream.peek().ok_or_else(|| "<end of input>".to_string())?) {
+        match (self, stream.peek().ok_or(None)?) {
             (TokenTree::Group(lhs), TokenTree::Group(rhs)) => {
                 (lhs.to_string() == rhs.to_string())
                     .then_some(1)
-                    .ok_or_else(|| rhs.to_string())
+                    .ok_or_else(|| Some(rhs.to_string()))
             }
             (TokenTree::Ident(lhs), TokenTree::Ident(rhs)) => {
                 (lhs.to_string() == rhs.to_string())
                     .then_some(1)
-                    .ok_or_else(|| rhs.to_string())
+                    .ok_or_else(|| Some(rhs.to_string()))
             }
             (TokenTree::Punct(lhs), TokenTree::Punct(rhs)) => {
                 (lhs.to_string() == rhs.to_string())
                     .then_some(1)
-                    .ok_or_else(|| rhs.to_string())
+                    .ok_or_else(|| Some(rhs.to_string()))
             }
             (TokenTree::Literal(lhs), TokenTree::Literal(rhs)) => {
                 (lhs.to_string() == rhs.to_string())
                     .then_some(1)
-                    .ok_or_else(|| rhs.to_string())
+                    .ok_or_else(|| Some(rhs.to_string()))
             }
-            (_, rhs) => Err(rhs.to_string()),
+            (_, rhs) => Err(Some(rhs.to_string())),
         }
     }
 }
@@ -67,7 +67,7 @@ impl<T> MatchStream for Vec<T>
 where
     T: MatchStream,
 {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
@@ -102,7 +102,7 @@ macro_rules! impl_tuple {
             $($t: MatchStream),+
         {
             #[allow(non_snake_case)]
-            fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, String>
+            fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
             where
                 S: StreamLike,
             {
