@@ -1,4 +1,4 @@
-use proc_macro2::{TokenStream, TokenTree, Span};
+use crate::procmacro::{TokenStream, TokenTree, Span};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -13,17 +13,31 @@ pub enum Error {
     },
 }
 
+#[cfg(feature = "proc-macro2")]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::EndOfStream => write!(f, "unexpected end of input"),
-            Self::Invalid(span) => write!(
-                f,
-                "invalid input (at {}:{}:{})",
-                span.local_file().unwrap_or_else(|| "<...>".into()).display(),
-                span.start().line,
-                span.start().column,
-            ),
+            Self::Invalid(span) => {
+                write!(
+                    f,
+                    "invalid input",
+                )?;
+
+                #[cfg(feature = "proc-macro2-span-locations")]
+                {
+                    let lc = span.start();
+                    write!(
+                        f,
+                        " (at {}:{}:{})",
+                        span.file(),
+                        lc.line,
+                        lc.column,
+                    )?;
+                }
+
+                Ok(())
+            }
             Self::Expected { expected, got, at } => {
                 if let Some(s) = expected {
                     write!(f, "expected `{s}`, got")?;
@@ -40,10 +54,47 @@ impl core::fmt::Display for Error {
                 let lc = at.start();
                 write!(
                     f,
-                    "(at {}:{}:{})",
-                    at.local_file().unwrap_or_else(|| "<...>".into()).display(),
+                    " (at {}:{}:{})",
+                    at.file(),
                     lc.line,
                     lc.column,
+                )
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "proc-macro2"))]
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::EndOfStream => write!(f, "unexpected end of input"),
+            Self::Invalid(span) => write!(
+                f,
+                "invalid input (at {}:{}:{})",
+                span.file(),
+                span.line(),
+                span.column(),
+            ),
+            Self::Expected { expected, got, at } => {
+                if let Some(s) = expected {
+                    write!(f, "expected `{s}`, got")?;
+                } else {
+                    write!(f, "expected end of stream, got")?;
+                }
+
+                if let Some(s) = got {
+                    write!(f, "`{s}`")?;
+                } else {
+                    write!(f, "end of stream")?;
+                }
+
+                write!(
+                    f,
+                    " (at {}:{}:{})",
+                    at.file(),
+                    at.line(),
+                    at.column(),
                 )
             }
         }
@@ -92,7 +143,7 @@ pub trait StreamLike {
 }
 
 pub struct Stream {
-    iter: proc_macro2::token_stream::IntoIter,
+    iter: crate::procmacro::token_stream::IntoIter,
     buffer: VecDeque<TokenTree>,
 }
 

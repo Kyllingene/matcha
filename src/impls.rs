@@ -1,5 +1,5 @@
 use crate::{Error, FromStream, MatchStream, Stream, StreamLike, StreamView};
-use proc_macro2::TokenTree;
+use crate::procmacro::TokenTree;
 
 impl FromStream for TokenTree {
     type Output = Self;
@@ -20,9 +20,19 @@ impl MatchStream for TokenTree {
                     .ok_or_else(|| Some(rhs.to_string()))
             }
             (TokenTree::Ident(lhs), TokenTree::Ident(rhs)) => {
-                (lhs == rhs)
-                    .then_some(1)
-                    .ok_or_else(|| Some(rhs.to_string()))
+                #[cfg(feature = "proc-macro2")]
+                {
+                    (lhs == rhs)
+                        .then_some(1)
+                        .ok_or_else(|| Some(rhs.to_string()))
+                }
+
+                #[cfg(not(feature = "proc-macro2"))]
+                {
+                    (lhs.to_string() == rhs.to_string())
+                        .then_some(1)
+                        .ok_or_else(|| Some(rhs.to_string()))
+                }
             }
             (TokenTree::Punct(lhs), TokenTree::Punct(rhs)) => {
                 (lhs.to_string() == rhs.to_string())
