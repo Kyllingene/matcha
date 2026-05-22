@@ -13,6 +13,7 @@
 //! - `proc-macro2-span-locations`: enables the `proc-macro2` feature
 //!   `span-locations`, allowing [errors](Error) to print their locations.
 
+#[cfg(not(feature = "proc-macro2"))]
 extern crate proc_macro;
 
 #[cfg(feature = "proc-macro2")]
@@ -27,9 +28,10 @@ mod impls;
 mod stream;
 mod utils;
 
-pub use stream::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+pub use stream::{Error, DiagDisplay, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
 pub use utils::{
-    Braces, Brackets, Delimited, Greedy, Group, GroupKind, Ident, Literal, Parens, Punct, punct,
+    Braces, Brackets, Delimited, Greedy, Group, GroupKind, Ident, Literal, Maybe, Parens, Punct,
+    punct,
 };
 
 /// Break down a [token stream](procmacro::TokenStream) into its constituents by
@@ -77,31 +79,31 @@ pub use utils::{
 ///     = Ident("extern");
 ///     
 ///     // tries to parse a type; can be anything that implements `FromStream`
-///     abi => Literal;
+///     abi: Literal;
 ///
 ///     = Ident("fn");
-///     name => Ident;
+///     name: Ident;
 ///
 ///     // parses a group delimited by parenthesis
 ///     (
-///         arg1_name => Ident;
+///         arg1_name: Ident;
 ///
 ///         // several convenience types are provided;
 ///         // this is equivalent to `Punct(':')`
 ///         = punct::Colon;
 ///
 ///         // binds a group delimited by `[]` without parsing the internals
-///         arg1_type => Brackets;
+///         arg1_type: Brackets;
 ///         
 ///         = punct::Comma;
 ///
-///         arg2_name => Ident;
+///         arg2_name: Ident;
 ///         = punct::Colon;
-///         arg2_type => Ident;
+///         arg2_type: Ident;
 ///
-///         // will consume a trailing commas; if a group has any tokens left
+///         // will consume a trailing comma; if a group has any tokens left
 ///         // unparsed, it raises an error
-///         _ => Option<punct::Comma>;
+///         _: Option<punct::Comma>;
 ///     );
 ///
 ///     // just like groups, if there were any tokens left unparsed in the
@@ -121,22 +123,29 @@ pub use utils::{
 /// ```
 #[macro_export]
 macro_rules! decompose {
-    (
+    ($($t:tt)*) => {
+        $crate::__decompose_inner! {$($t)*}
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __decompose_inner {
+    ( @nongreedy
         $input_stream:expr;
         $(
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
 
-            $( $($bind_name:ident)? $(_)? => $bind_type:ty )?
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
             $( = $match_expr:expr )?
-        );+
-    ) => {
-    $(
+        ;)+
+    ) => { $(
         $(
             let group = <$crate::Parens as $crate::FromStream>::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
-            $crate::decompose! {
+            $crate::__decompose_inner! {
                 stream;
 
                 $($paren_group)*
@@ -146,7 +155,7 @@ macro_rules! decompose {
         $(
             let group = <$crate::Braces as $crate::FromStream>::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
-            $crate::decompose! {
+            $crate::__decompose_inner! {
                 stream;
 
                 $($brace_group)*
@@ -156,7 +165,7 @@ macro_rules! decompose {
         $(
             let group = <$crate::Brackets as $crate::FromStream>::from_stream(&mut $input_stream)?;
             let mut stream = $crate::Stream::from(group.inner);
-            $crate::decompose! {
+            $crate::__decompose_inner! {
                 stream;
 
                 $($bracket_group)*
@@ -173,7 +182,7 @@ macro_rules! decompose {
                 Ok(n) => $input_stream.skip(n),
                 Err(s) => {
                     return Err($crate::Error {
-                        expected: $crate::ErrorText::Backticks($match_expr.to_string()),
+                        expected: $crate::ErrorText::Backticks($crate::DiagDisplay::diag_string(&$match_expr)),
                         got: match s {
                             Some(s) => $crate::ErrorText::Backticks(s),
                             None => $crate::ErrorText::EndOfStream,
@@ -183,7 +192,29 @@ macro_rules! decompose {
                 }
             }
         )?
-    )+
+    )+ };
+
+    ( @greedy
+        $input_stream:expr;
+        $(
+            $(( $($paren_group:tt)* ))?
+            $({ $($brace_group:tt)* })?
+            $([ $($bracket_group:tt)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
+            $( = $match_expr:expr )?
+        ;)+
+    ) => {
+        $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $(( $($paren_group)* ))?
+            $({ $($brace_group)* })?
+            $([ $($bracket_group)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name)? : $bind_type )?
+            $( = $match_expr )?
+        ;)+ }
 
         if let Some(tt) = $input_stream.peek() {
             let span = tt.span();
@@ -196,22 +227,93 @@ macro_rules! decompose {
     };
 
     (
+        in $input_stream:expr;
+        $(
+            $(( $($paren_group:tt)* ))?
+            $({ $($brace_group:tt)* })?
+            $([ $($bracket_group:tt)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
+            $( = $match_expr:expr )?
+        ;)+
+    ) => {
+        $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $(( $($paren_group)* ))?
+            $({ $($brace_group)* })?
+            $([ $($bracket_group)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name)? : $bind_type )?
+            $( = $match_expr )?
+        ;)+ }
+    };
+
+    (
+        in $input_stream:expr;
+        $(
+            $(( $($paren_group:tt)* ))?
+            $({ $($brace_group:tt)* })?
+            $([ $($bracket_group:tt)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
+            $( = $match_expr:expr )?
+        );+
+    ) => {
+        $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $(( $($paren_group)* ))?
+            $({ $($brace_group)* })?
+            $([ $($bracket_group)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name)? : $bind_type )?
+            $( = $match_expr )?
+        ;)+ }
+    };
+
+    (
         $input_stream:expr;
         $(
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
+            $(?{ $($opt_block:tt)* })?
 
-            $( $($bind_name:ident)? $(_)? => $bind_type:ty )?
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
             $( = $match_expr:expr )?
         ;)+
     ) => {
-        $crate::decompose! { $(
+        $crate::__decompose_inner! { @greedy $input_stream; $(
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?
+            $(?{ $($opt_block:tt)* })?
 
-            $( $($bind_name)? $(_)? => $bind_type )?
+            $( $($bind_name)? : $bind_type )?
+            $( = $match_expr )?
+        ;)+ }
+    };
+
+    (
+        $input_stream:expr;
+        $(
+            $(( $($paren_group:tt)* ))?
+            $({ $($brace_group:tt)* })?
+            $([ $($bracket_group:tt)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
+            $( = $match_expr:expr )?
+        );+
+    ) => {
+        $crate::__decompose_inner! { @greedy $input_stream; $(
+            $(( $($paren_group)* ))?
+            $({ $($brace_group)* })?
+            $([ $($bracket_group)* ])?
+            $(?{ $($opt_block:tt)* })?
+
+            $( $($bind_name)? : $bind_type )?
             $( = $match_expr )?
         ;)+ }
     };

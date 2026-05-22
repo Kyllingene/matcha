@@ -1,5 +1,5 @@
 use crate::procmacro::{Delimiter, TokenStream, TokenTree};
-use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
 use core::fmt;
 
 /// The delimiters used by a [`Group`].
@@ -137,6 +137,12 @@ impl fmt::Display for Group {
     }
 }
 
+impl DiagDisplay for Group {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 /// A helper for parsing a [`Group`] with [`GroupKind::Paren`].
 pub struct Parens;
 /// A helper for parsing a [`Group`] with [`GroupKind::Brace`].
@@ -238,6 +244,9 @@ impl FromStream for Brackets {
 ///
 /// Parses a series of items (`T`), separated by delimiters (`D`), with an
 /// optional trailing delimiter.
+///
+/// Note that this doesn't parse any brackets around the items; for example, if
+/// you want to parse a tuple, you'd need to layer [`Parens`].
 pub struct Delimited<T, D> {
     _items: core::marker::PhantomData<T>,
     _delimiter: core::marker::PhantomData<D>,
@@ -279,6 +288,24 @@ impl<T: FromStream> FromStream for Greedy<T> {
         } else {
             Ok(item)
         }
+    }
+}
+
+/// A helper for optionally matching a given pattern.
+pub struct Maybe<T>(pub T);
+
+impl<T: MatchStream> MatchStream for Maybe<T> {
+    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    where
+        S: StreamLike,
+    {
+        Ok(self.0.match_stream(stream).unwrap_or(0))
+    }
+}
+
+impl<T: DiagDisplay> DiagDisplay for Maybe<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -331,6 +358,12 @@ impl MatchStream for Ident<'_> {
 impl fmt::Display for Ident<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl DiagDisplay for Ident<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
@@ -396,6 +429,13 @@ impl fmt::Display for Punct {
     }
 }
 
+
+impl DiagDisplay for Punct {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 #[cfg(feature = "quote")]
 impl quote::ToTokens for Punct {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
@@ -453,6 +493,12 @@ impl fmt::Display for Literal<'_> {
     }
 }
 
+impl DiagDisplay for Literal<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 #[cfg(feature = "quote")]
 impl quote::ToTokens for Literal<'_> {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
@@ -465,7 +511,7 @@ impl quote::ToTokens for Literal<'_> {
 /// Helpers for parsing specific [`Punct`]s.
 pub mod punct {
     use crate::procmacro::TokenTree;
-    use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+    use crate::{Error, DiagDisplay, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
     use core::fmt;
 
     macro_rules! impl_punct {
@@ -528,6 +574,12 @@ pub mod punct {
             impl fmt::Display for $name {
                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                     $p.fmt(f)
+                }
+            }
+
+            impl DiagDisplay for $name {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "{self}")
                 }
             }
         )+};

@@ -1,5 +1,5 @@
 use crate::procmacro::TokenTree;
-use crate::{Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+use crate::{Error, ErrorText, DiagDisplay, FromStream, MatchStream, Stream, StreamLike, StreamView};
 
 impl FromStream for TokenTree {
     type Output = Self;
@@ -44,6 +44,12 @@ impl MatchStream for TokenTree {
     }
 }
 
+impl DiagDisplay for TokenTree {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 impl<T> FromStream for Option<T>
 where
     T: FromStream,
@@ -65,6 +71,74 @@ where
             vec.push(item);
         }
         Ok(vec)
+    }
+}
+
+impl<T: DiagDisplay> DiagDisplay for [T] {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for item in self {
+            item.fmt(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<T> MatchStream for [T]
+where
+    T: MatchStream,
+{
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    where
+        S: StreamLike,
+    {
+        let mut total = 0;
+        for item in self {
+            let len = item.match_stream(stream.view())?;
+            total += len;
+            stream.skip(len);
+        }
+
+        Ok(total)
+    }
+}
+
+impl<T: DiagDisplay, const N: usize> DiagDisplay for [T; N] {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for item in self {
+            item.fmt(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<T, const N: usize> MatchStream for [T; N]
+where
+    T: MatchStream,
+{
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    where
+        S: StreamLike,
+    {
+        let mut total = 0;
+        for item in self {
+            let len = item.match_stream(stream.view())?;
+            total += len;
+            stream.skip(len);
+        }
+
+        Ok(total)
+    }
+}
+
+impl<T: DiagDisplay> DiagDisplay for Vec<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for item in self {
+            item.fmt(f)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -99,6 +173,18 @@ macro_rules! impl_tuple {
                 Ok(($(
                     $t::from_stream(stream)?,
                 )+))
+            }
+        }
+
+        impl<$($t),+> DiagDisplay for ($($t,)+)
+        where
+            $($t: DiagDisplay),+
+        {
+            #[allow(non_snake_case)]
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                let ($($t,)+) = self;
+                $( $t.fmt(f)?; )+
+                Ok(())
             }
         }
 

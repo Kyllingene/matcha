@@ -63,7 +63,9 @@ impl core::fmt::Display for Error {
 #[cfg(not(feature = "proc-macro2"))]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "expected {}, got {} (at {}:{}:{})", self.expected, self.got
+        write!(f, "expected {}, got {} (at {}:{}:{})",
+            self.expected,
+            self.got,
             self.at.file(),
             self.at.line(),
             self.at.column(),
@@ -83,7 +85,7 @@ pub trait FromStream {
 }
 
 /// Test a pattern against a [`StreamView`].
-pub trait MatchStream {
+pub trait MatchStream: DiagDisplay {
     /// Test the pattern against the stream.
     ///
     /// If it matches, returns `Ok(n)`, where `n` is how many tokens the pattern
@@ -95,6 +97,36 @@ pub trait MatchStream {
     fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike;
+}
+
+/// Print a [`MatchStream`] pattern out, for use in diagnostics.
+///
+/// Essentially just [`core::fmt::Display`].
+pub trait DiagDisplay {
+    /// See [`core::fmt::Display::fmt`].
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result;
+
+    /// See [`core::str::ToString::to_string`].
+    fn diag_string(&self) -> String {
+        use core::fmt::Write;
+
+        struct Wrap<T: ?Sized>(T);
+        impl<T: DiagDisplay> core::fmt::Display for Wrap<T> {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                self.0.fmt(f)
+            }
+        }
+
+        let mut s = String::new();
+        write!(&mut s, "{}", Wrap(self)).expect("failed to stringify");
+        s
+    }
+}
+
+impl<T: DiagDisplay + ?Sized> DiagDisplay for &T {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        (**self).fmt(f)
+    }
 }
 
 /// A type that can be viewed like a [`Stream`], but without popping tokens.

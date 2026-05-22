@@ -1,0 +1,1 @@
+extern "C" fn foo(x: String, y: usize) -> Option<char>;
