@@ -1,4 +1,4 @@
-use proc_macro::{TokenStream, TokenTree, Span};
+use proc_macro2::{TokenStream, TokenTree, Span};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -21,8 +21,8 @@ impl core::fmt::Display for Error {
                 f,
                 "invalid input (at {}:{}:{})",
                 span.local_file().unwrap_or_else(|| "<...>".into()).display(),
-                span.line(),
-                span.column(),
+                span.start().line,
+                span.start().column,
             ),
             Self::Expected { expected, got, at } => {
                 if let Some(s) = expected {
@@ -37,12 +37,13 @@ impl core::fmt::Display for Error {
                     write!(f, "end of stream")?;
                 }
 
+                let lc = at.start();
                 write!(
                     f,
                     "(at {}:{}:{})",
                     at.local_file().unwrap_or_else(|| "<...>".into()).display(),
-                    at.line(),
-                    at.column(),
+                    lc.line,
+                    lc.column,
                 )
             }
         }
@@ -91,7 +92,7 @@ pub trait StreamLike {
 }
 
 pub struct Stream {
-    iter: proc_macro::token_stream::IntoIter,
+    iter: proc_macro2::token_stream::IntoIter,
     buffer: VecDeque<TokenTree>,
 }
 

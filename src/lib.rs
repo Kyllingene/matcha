@@ -1,5 +1,8 @@
 extern crate proc_macro;
 
+#[doc(hidden)]
+pub use proc_macro2;
+
 mod impls;
 mod stream;
 mod utils;
@@ -55,7 +58,7 @@ macro_rules! decompose {
         )?
 
         $(
-            let span = $input_stream.peek().map(|tt| tt.span()).unwrap_or(::proc_macro::Span::call_site());
+            let span = $input_stream.peek().map(|tt| tt.span()).unwrap_or($crate::proc_macro2::Span::call_site());
             match <_ as $crate::MatchStream>::match_stream(&$eq_expr, $input_stream.view()) {
                 Ok(n) => $input_stream.skip(n),
                 Err(s) => {

@@ -1,5 +1,5 @@
 use crate::{Error, FromStream, MatchStream, Stream, StreamLike, StreamView};
-use proc_macro::{Delimiter, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, TokenStream, TokenTree};
 use core::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,8 +27,8 @@ pub struct Group {
     pub inner: TokenStream,
 }
 
-impl From<proc_macro::Group> for Group {
-    fn from(g: proc_macro::Group) -> Self {
+impl From<proc_macro2::Group> for Group {
+    fn from(g: proc_macro2::Group) -> Self {
         Self {
             kind: g.delimiter().into(),
             inner: g.stream(),
@@ -36,8 +36,8 @@ impl From<proc_macro::Group> for Group {
     }
 }
 
-impl From<&proc_macro::Group> for Group {
-    fn from(g: &proc_macro::Group) -> Self {
+impl From<&proc_macro2::Group> for Group {
+    fn from(g: &proc_macro2::Group) -> Self {
         Self {
             kind: g.delimiter().into(),
             inner: g.stream(),
@@ -337,7 +337,7 @@ impl fmt::Display for Literal<'_> {
 
 pub mod punct {
     use crate::{FromStream, MatchStream, StreamLike, StreamView, Stream, Error};
-    use proc_macro::TokenTree;
+    use proc_macro2::TokenTree;
     use core::fmt;
 
     macro_rules! impl_punct {
