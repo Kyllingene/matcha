@@ -4,10 +4,17 @@
 /// Matches a pattern to a token stream, parsing and binding variables along
 /// the way.
 ///
-/// # Patterns
-///
 /// The first argument is a [`Stream`](crate::Stream) (or `&mut Stream`). Every
-/// subsequent argument is an arm in the pattern
+/// subsequent argument is an arm in the pattern.
+///
+/// The first argument may be preceded by `in` (e.g. `in stream;`). This
+/// disables "greedy mode", where an error is raised if the stream is not
+/// empty at the end of parsing.
+///
+/// If you need this behavior inside a block, consider binding against a
+/// trailing `Vec<TokenTree>`.
+///
+/// # Patterns
 ///
 /// There are three kinds of "arms" in a pattern:
 ///  - Match arms: `= expr`, where `expr` is any expression evaluating to a type
@@ -18,6 +25,11 @@
 ///  - Nesting arms: `( ... )`, `[ ... ]`, and `{ ... }`. These define a
 ///    recursion into a group delimited by the given arms. These can contain any
 ///    number of other match arms, including further nesting.
+///
+/// In addition, you can use the "cut" operator (written `^;`), to specify that
+/// from this point forward, errors are non-recoverable. You can use this to
+/// improve error messages by prohibiting upstream from trying to recover when
+/// you encounter a hard error. See also [`Cut`](crate::Cut).
 ///
 /// If a pattern fails to match or bind at any step, it will return an error
 /// from the enclosing function.
@@ -51,6 +63,8 @@
 ///
 ///     // parses a group delimited by parenthesis
 ///     (
+///         ^; // does nothing in this example, but here it is
+///
 ///         arg1_name: Ident;
 ///
 ///         // several convenience types are provided;
@@ -99,6 +113,8 @@ macro_rules! __decompose_inner {
     ( @nongreedy
         $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -106,9 +122,14 @@ macro_rules! __decompose_inner {
             $( $($bind_name:ident)? $(_)? : $bind_type:ty )?
             $( = $match_expr:expr )?
         ;)+
-    ) => { $(
+    ) => {
+            let mut cut = false;
+    $(
+        $( cut = true; $($cut)? )?
+
         $(
-            let group = <$crate::Parens as $crate::FromStream>::from_stream(&mut $input_stream)?;
+            let group = <$crate::Parens as $crate::FromStream>::from_stream(&mut $input_stream)
+                .map_err(|e| e.with_fatal(cut))?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::__decompose_inner! {
                 stream;
@@ -118,7 +139,8 @@ macro_rules! __decompose_inner {
         )?
 
         $(
-            let group = <$crate::Braces as $crate::FromStream>::from_stream(&mut $input_stream)?;
+            let group = <$crate::Braces as $crate::FromStream>::from_stream(&mut $input_stream)
+                .map_err(|e| e.with_fatal(cut))?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::__decompose_inner! {
                 stream;
@@ -128,7 +150,8 @@ macro_rules! __decompose_inner {
         )?
 
         $(
-            let group = <$crate::Brackets as $crate::FromStream>::from_stream(&mut $input_stream)?;
+            let group = <$crate::Brackets as $crate::FromStream>::from_stream(&mut $input_stream)
+                .map_err(|e| e.with_fatal(cut))?;
             let mut stream = $crate::Stream::from(group.inner);
             $crate::__decompose_inner! {
                 stream;
@@ -139,7 +162,8 @@ macro_rules! __decompose_inner {
 
         $(
             $( let $bind_name = )?
-                <$bind_type as $crate::FromStream>::from_stream(&mut $input_stream)?;
+                <$bind_type as $crate::FromStream>::from_stream(&mut $input_stream)
+                .map_err(|e| e.with_fatal(cut))?;
         )?
         $(
             let span = $crate::StreamLike::peek(&mut $input_stream)
@@ -155,7 +179,7 @@ macro_rules! __decompose_inner {
                             None => $crate::ErrorText::EndOfStream,
                         },
                         span,
-                    ));
+                    ).with_fatal(cut));
                 }
             }
         )?
@@ -164,6 +188,8 @@ macro_rules! __decompose_inner {
     ( @greedy
         $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -174,6 +200,8 @@ macro_rules! __decompose_inner {
         ;)+
     ) => {
         $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $( ^ $($cut)? )?
+
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?
@@ -191,13 +219,15 @@ macro_rules! __decompose_inner {
                     $crate::StreamLike::stringify(&mut $input_stream),
                 ),
                 span,
-            ));
+            ).fatal());
         }
     };
 
     (
         in $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -208,6 +238,8 @@ macro_rules! __decompose_inner {
         ;)+
     ) => {
         $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $( ^ $($cut)? )?
+
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?
@@ -221,6 +253,8 @@ macro_rules! __decompose_inner {
     (
         in $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -231,6 +265,8 @@ macro_rules! __decompose_inner {
         );+
     ) => {
         $crate::__decompose_inner! { @nongreedy $input_stream; $(
+            $( ^ $($cut)? )?
+
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?
@@ -244,6 +280,8 @@ macro_rules! __decompose_inner {
     (
         $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -254,6 +292,8 @@ macro_rules! __decompose_inner {
         ;)+
     ) => {
         $crate::__decompose_inner! { @greedy $input_stream; $(
+            $( ^ $($cut)? )?
+
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?
@@ -267,6 +307,8 @@ macro_rules! __decompose_inner {
     (
         $input_stream:expr;
         $(
+            $( ^ $(@@ $cut:tt)? )?
+
             $(( $($paren_group:tt)* ))?
             $({ $($brace_group:tt)* })?
             $([ $($bracket_group:tt)* ])?
@@ -277,6 +319,8 @@ macro_rules! __decompose_inner {
         );+
     ) => {
         $crate::__decompose_inner! { @greedy $input_stream; $(
+            $( ^ $($cut)? )?
+
             $(( $($paren_group)* ))?
             $({ $($brace_group)* })?
             $([ $($bracket_group)* ])?

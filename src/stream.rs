@@ -74,8 +74,21 @@ impl Error {
     ///
     /// Fatal errors must not be recovered from. If you encounter a fatal error,
     /// you must return it untouched.
+    ///
+    /// See also [`with_fatal`](Self::with_fatal).
     pub const fn fatal(mut self) -> Self {
         self.fatal = true;
+        self
+    }
+
+    /// Flags this error as fatal or not fatal.
+    ///
+    /// Fatal errors must not be recovered from. If you encounter a fatal error,
+    /// you must return it untouched.
+    ///
+    /// See also the shorthand [`fatal`](Self::fatal).
+    pub const fn with_fatal(mut self, fatal: bool) -> Self {
+        self.fatal = fatal;
         self
     }
 }

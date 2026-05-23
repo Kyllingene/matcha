@@ -1,4 +1,13 @@
 /// Implement [`FromStream`](crate::FromStream) for a struct or enum.
+///
+/// Note that each field's actual type is `<T as FromStream>::Output`, *not* `T`
+/// itself.
+///
+/// Among the fields, you can also use `= expr` to match a literal expression
+/// implementing [`MatchStream`](crate::MatchStream). You can also use what I
+/// like to call the "Archibald operator", `;^,`, to insert a "cut" operator.
+///
+/// See [`decompose!`](crate::decompose) for more information.
 #[macro_export]
 macro_rules! compose {
     ($($t:tt)*) => { $crate::__compose_inner! {$($t)*} };
@@ -21,9 +30,8 @@ macro_rules! __compose_inner {
                 $(#[$field_attrs:meta])*
                 $field_v:vis $field_name:ident : $field_type:ty
             )?
-            $(
-                = $match_expr:expr
-            )?
+            $( = $match_expr:expr )?
+            $( ; ^ $(@@ $cut:tt)? )?
         ,)+ }
     ) => {
         $crate::__compose_inner! {
@@ -33,17 +41,16 @@ macro_rules! __compose_inner {
                 $($lifetimes)?
                 $($generics)?
                 $(!const $const_generics : $const_generic_types)?
-            ),* $(,)? >)?
+            ),* >)?
             $(where [$($where)*])?
             { $(
                 $(
                     $(#[$field_attrs])*
                     $field_v $field_name : $field_type
                 )?
-                $(
-                    = $match_expr
-                )?
-            ,)+ }
+                $( = $match_expr )?
+                $( ; ^ $($cut)? )?
+            ),+ }
         }
     };
 
@@ -54,16 +61,15 @@ macro_rules! __compose_inner {
             $($lifetimes:lifetime)?
             $($generics:ident)?
             $(!const $const_generics:ident : $const_generic_types:ty)?
-        ),* $(,)? >)?
+        ),* >)?
         $(where [$($where:tt)*])?
         { $(
             $(
                 $(#[$field_attrs:meta])*
                 $field_v:vis $field_name:ident : $field_type:ty
             )?
-            $(
-                = $match_expr:expr
-            )?
+            $( = $match_expr:expr )?
+            $( ; ^ $(@@ $cut:tt)? )?
         ),+ }
     ) => {
         $(#[$attrs])*
@@ -105,6 +111,7 @@ macro_rules! __compose_inner {
                     in stream;
 
                 $(
+                    $( ^; $($cut:tt)? )?
                     $( $field_name: $field_type; )?
                     $( = $match_expr; )?
                 )+

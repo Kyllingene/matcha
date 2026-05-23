@@ -12,7 +12,8 @@ compose! {
     ] {
         x: Ident<'static>,
         = punct::Colon,
-        y: [T; N]
+        ;^,
+        y: [T; N],
     }
 }
 
@@ -39,14 +40,15 @@ fn compose_struct() -> Result<(), Error> {
 
 #[test]
 fn compose_enum() {
-    let [i1, i2, i3, i4] = ["foo: 1 2 3", "bar", ";", "456"]
+    let [i1, i2, i3, i4, i5] = ["foo: 1 2 3", "bar", ";", "456", "baz: x y z"]
         .map(|s| s.parse::<TokenStream>().expect("invalid test input"));
 
-    let (b1, b2, b3, b4) = (
+    let (b1, b2, b3, b4, b5) = (
         Bar::from_stream(&mut Stream::from(i1)).unwrap(),
         Bar::from_stream(&mut Stream::from(i2)).unwrap(),
         Bar::from_stream(&mut Stream::from(i3)).unwrap(),
         Bar::from_stream(&mut Stream::from(i4)),
+        Bar::from_stream(&mut Stream::from(i5)),
     );
 
     assert_eq!(
@@ -58,5 +60,7 @@ fn compose_enum() {
     );
     assert_eq!(b2, Bar::B(Ident("bar")));
     assert_eq!(b3, Bar::C(punct::Semicolon));
-    assert!(b4.is_err());
+
+    assert!(!b4.unwrap_err().fatal);
+    assert!(b5.unwrap_err().fatal);
 }
