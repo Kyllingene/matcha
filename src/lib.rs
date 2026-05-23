@@ -1,6 +1,6 @@
 //! A framework for breaking down token streams in proc macros.
 //!
-//! The macros [`decompose!`] and [`decompose!`] are the main entrypoints for this crate. However,
+//! The macros [`decompose!`] and [`compose!`] are the main entrypoints for this crate. However,
 //! it's worth familiarizing yourself with all the types/traits.
 //!
 //! # Features
