@@ -64,7 +64,7 @@ where
     {
         match T::from_stream(stream) {
             Ok(x) => Ok(Some(x)),
-            Err(e) if e.fatal => return Err(e),
+            Err(e) if e.fatal => Err(e),
             Err(_) => Ok(None),
         }
     }

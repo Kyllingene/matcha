@@ -1,11 +1,17 @@
 [package]
 name = "matcha"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 
+license = "MIT OR Apache-2.0"
+description = "Utilities for breaking down token streams in proc macros."
+
+keywords = ["macros"]
+categories = ["development-tools::procedural-macro-helpers", "parser-implementations"]
+
 [dependencies]
-proc-macro2 = { version = "1.0.106", optional = true }
-quote = { version = "1.0.45", optional = true }
+proc-macro2 = { version = "1.0", optional = true }
+quote = { version = "1.0", optional = true }
 
 [features]
 default = ["proc-macro2-span-locations", "quote"]

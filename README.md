@@ -17,14 +17,14 @@ cargo-reedme: info-end -->
 
 A framework for breaking down token streams in proc macros.
 
-The macro [`decompose!`](https://docs.rs/matcha/latest/matcha/macro.decompose.html) is the main entrypoint for this crate. However, the
-surrounding types/traits can be useful regardless.
+The macros [`decompose!`](https://docs.rs/matcha/latest/matcha/macro.decompose.html) and [`decompose!`](https://docs.rs/matcha/latest/matcha/macro.decompose.html) are the main entrypoints for this crate. However,
+it’s worth familiarizing yourself with all the types/traits.
 
 ## Features
 
 The following features are provided (all are enabled by default).
 
-- `quote`: enables [`ToTokens`](https://docs.rs/quote/1.0.45/quote/to_tokens/trait.ToTokens.html) impls for various types.
+- `quote`: enables [`quote::ToTokens`](https://docs.rs/quote/1.0.45/quote/to_tokens/trait.ToTokens.html) impls for various types.
 - `proc-macro2`: uses the [`proc-macro2`](proc-macro2) crate instead of the
   built-in `proc-macro`.
 - `proc-macro2-span-locations`: enables the `proc-macro2` feature
@@ -34,4 +34,5 @@ The following features are provided (all are enabled by default).
 
 ## License
 
-This project is licensed under the MIT license. See `LICENSE.md` for details.
+This project is licensed under either the MIT or Apache 2.0 license, at your
+option. See `LICENSE-MIT` and `LICENSE-APACHE` for details.

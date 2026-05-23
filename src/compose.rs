@@ -7,7 +7,7 @@
 /// implementing [`MatchStream`](crate::MatchStream). You can also use what I
 /// like to call the "Archibald operator", `;^,`, to insert a "cut" operator.
 ///
-/// See [`decompose!`](crate::decompose) for more information.
+/// See [`decompose!`](crate::decompose!) for more information.
 #[macro_export]
 macro_rules! compose {
     ($($t:tt)*) => { $crate::__compose_inner! {$($t)*} };
