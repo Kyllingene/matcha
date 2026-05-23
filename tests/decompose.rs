@@ -11,7 +11,10 @@ struct Arg {
 
 impl FromStream for Arg {
     type Output = Self;
-    fn from_stream(mut stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(mut stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         decompose! {
             in stream;
 
@@ -26,7 +29,8 @@ impl FromStream for Arg {
 
 #[test]
 fn main() -> Result<(), Error> {
-    let input = include_str!("decompose_input.txt").parse::<TokenStream>()
+    let input = include_str!("decompose_input.txt")
+        .parse::<TokenStream>()
         .expect("invalid test input");
 
     let mut stream = Stream::from(input);
@@ -54,16 +58,19 @@ fn main() -> Result<(), Error> {
     assert_eq!(abi, Some(Literal("\"C\"")));
     assert_eq!(name.0, "foo");
 
-    assert_eq!(args, [
-        Arg {
-            name: Ident("x"),
-            type_: Ident("String"),
-        },
-        Arg {
-            name: Ident("y"),
-            type_: Ident("usize"),
-        },
-    ]);
+    assert_eq!(
+        args,
+        [
+            Arg {
+                name: Ident("x"),
+                type_: Ident("String"),
+            },
+            Arg {
+                name: Ident("y"),
+                type_: Ident("usize"),
+            },
+        ]
+    );
 
     assert_eq!(wrapper.0, "Option");
     assert_eq!(inner.0, "char");

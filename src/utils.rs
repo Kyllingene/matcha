@@ -1,5 +1,7 @@
 use crate::procmacro::{Delimiter, TokenStream, TokenTree};
-use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+use crate::{
+    DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView,
+};
 use core::fmt;
 
 /// The delimiters used by a [`Group`].
@@ -87,7 +89,10 @@ impl From<Group> for crate::procmacro::Group {
 
 impl FromStream for Group {
     type Output = Self;
-    fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -98,11 +103,7 @@ impl FromStream for Group {
         let result = if let TokenTree::Group(g) = tok {
             Ok(g.into())
         } else {
-            return Err(Error {
-                expected: ErrorText::Plain("`(`, `[`, or `{`".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: span,
-            });
+            return Err(Error::new(ErrorText::Plain("`(`, `[`, or `{`".into()),  ErrorText::Backticks(tok.to_string()), span));
         };
 
         stream.pop();
@@ -152,7 +153,10 @@ pub struct Brackets;
 
 impl FromStream for Parens {
     type Output = Group;
-    fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -168,11 +172,7 @@ impl FromStream for Parens {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error {
-                expected: ErrorText::Backticks("(".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: span,
-            });
+            return Err(Error::new(ErrorText::Backticks("(".into()),  ErrorText::Backticks(tok.to_string()), span));
         };
 
         stream.pop();
@@ -182,7 +182,10 @@ impl FromStream for Parens {
 
 impl FromStream for Braces {
     type Output = Group;
-    fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -198,11 +201,7 @@ impl FromStream for Braces {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error {
-                expected: ErrorText::Backticks("{".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: span,
-            });
+            return Err(Error::new(ErrorText::Backticks("{".into()),  ErrorText::Backticks(tok.to_string()), span));
         };
 
         stream.pop();
@@ -212,7 +211,10 @@ impl FromStream for Braces {
 
 impl FromStream for Brackets {
     type Output = Group;
-    fn from_stream(stream: &mut Stream) -> Result<Group, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -228,11 +230,7 @@ impl FromStream for Brackets {
                 inner: g.stream(),
             })
         } else {
-            return Err(Error {
-                expected: ErrorText::Backticks("[".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: span,
-            });
+            return Err(Error::new(ErrorText::Backticks("[".into()),  ErrorText::Backticks(tok.to_string()), span));
         };
 
         stream.pop();
@@ -254,7 +252,10 @@ pub struct Delimited<T, D> {
 
 impl<T: FromStream, D: FromStream> FromStream for Delimited<T, D> {
     type Output = Vec<T::Output>;
-    fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
         let mut items = Vec::new();
 
         while let Ok(item) = T::from_stream(stream) {
@@ -276,15 +277,17 @@ pub struct Greedy<T>(core::marker::PhantomData<T>);
 
 impl<T: FromStream> FromStream for Greedy<T> {
     type Output = T::Output;
-    fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
+
+    #[cfg_attr(all(not(feature = "proc-macro2"), feature = "proc-macro2-span-locations"),
+        expect(unused_variables, reason = "`span` isn't used without span locations"))]
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
         let item = T::from_stream(stream)?;
         if let Some(tt) = stream.peek() {
             let span = tt.span();
-            Err(Error {
-                expected: ErrorText::EndOfStream,
-                got: ErrorText::Backticks(stream.stringify()),
-                at: span,
-            })
+            Err(Error::new(ErrorText::EndOfStream,  ErrorText::Backticks(stream.stringify()), span))
         } else {
             Ok(item)
         }
@@ -318,7 +321,10 @@ pub struct Ident<'a>(pub &'a str);
 
 impl FromStream for Ident<'static> {
     type Output = Self;
-    fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -330,11 +336,7 @@ impl FromStream for Ident<'static> {
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error {
-                expected: ErrorText::Plain("ident".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: tok.span(),
-            })
+            Err(Error::new(ErrorText::Plain("ident".into()),  ErrorText::Backticks(tok.to_string()), tok.span()))
         }
     }
 }
@@ -386,7 +388,10 @@ pub struct Punct(pub char);
 
 impl FromStream for Punct {
     type Output = Self;
-    fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -398,11 +403,7 @@ impl FromStream for Punct {
             stream.pop();
             Ok(Self(c))
         } else {
-            Err(Error {
-                expected: ErrorText::Plain("punctuation".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: tok.span(),
-            })
+            Err(Error::new(ErrorText::Plain("punctuation".into()),  ErrorText::Backticks(tok.to_string()), tok.span()))
         }
     }
 }
@@ -429,7 +430,6 @@ impl fmt::Display for Punct {
     }
 }
 
-
 impl DiagDisplay for Punct {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self}")
@@ -450,7 +450,10 @@ pub struct Literal<'a>(pub &'a str);
 
 impl FromStream for Literal<'static> {
     type Output = Self;
-    fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         let tok = match stream.peek() {
             Some(tt) => tt,
             None => {
@@ -462,11 +465,7 @@ impl FromStream for Literal<'static> {
             stream.pop();
             Ok(Self(s))
         } else {
-            Err(Error {
-                expected: ErrorText::Plain("literal".into()),
-                got: ErrorText::Backticks(tok.to_string()),
-                at: tok.span(),
-            })
+            Err(Error::new(ErrorText::Plain("literal".into()),  ErrorText::Backticks(tok.to_string()), tok.span()))
         }
     }
 }
@@ -511,7 +510,9 @@ impl quote::ToTokens for Literal<'_> {
 /// Helpers for parsing specific [`Punct`]s.
 pub mod punct {
     use crate::procmacro::TokenTree;
-    use crate::{Error, DiagDisplay, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView};
+    use crate::{
+        DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView,
+    };
     use core::fmt;
 
     macro_rules! impl_punct {
@@ -528,7 +529,8 @@ pub mod punct {
 
             impl FromStream for $name {
                 type Output = Self;
-                fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+                fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+where S: StreamLike, {
                     let tok = match stream.peek() {
                         Some(tt) => tt,
                         None => {
@@ -540,11 +542,7 @@ pub mod punct {
                         stream.pop();
                         Ok(Self)
                     } else {
-                        Err(Error {
-                            expected: ErrorText::Backticks($p.to_string()),
-                            got: ErrorText::Backticks(tok.to_string()),
-                            at: tok.span(),
-                        })
+                        Err(Error::new(ErrorText::Backticks($p.to_string()),  ErrorText::Backticks(tok.to_string()), tok.span()))
                     }
                 }
             }

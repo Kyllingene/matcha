@@ -45,6 +45,27 @@ pub struct Error {
     pub at: Span,
 }
 
+impl Error {
+    /// Create a new error.
+    ///
+    /// If feature `proc-macro2` is enabled but not
+    /// `proc-macro2-span-locations`, ignores `at`.
+    #[cfg_attr(all(not(feature = "proc-macro2-span-locations"), feature = "proc-macro2"),
+        expect(unused_variables, reason = "`at` isn't used without span locations"))]
+    pub const fn new(
+        expected: ErrorText,
+        got: ErrorText,
+        at: Span,
+    ) -> Self {
+        Self {
+            expected,
+            got,
+            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
+            at,
+        }
+    }
+}
+
 #[cfg(feature = "proc-macro2")]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -63,7 +84,9 @@ impl core::fmt::Display for Error {
 #[cfg(not(feature = "proc-macro2"))]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "expected {}, got {} (at {}:{}:{})",
+        write!(
+            f,
+            "expected {}, got {} (at {}:{}:{})",
             self.expected,
             self.got,
             self.at.file(),
@@ -81,7 +104,9 @@ pub trait FromStream {
     type Output: Sized;
 
     /// Attempt to parse the type from the stream.
-    fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error>;
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike;
 }
 
 /// Test a pattern against a [`StreamView`].
@@ -134,14 +159,26 @@ impl<T: DiagDisplay + ?Sized> DiagDisplay for &T {
 /// See [`StreamView`].
 #[allow(missing_docs)]
 pub trait StreamLike {
+    fn pop(&mut self) -> Option<TokenTree>;
     fn peek(&mut self) -> Option<&TokenTree>;
     fn peek_nth(&mut self, n: usize) -> Option<&TokenTree>;
     fn peek_last(&mut self) -> Option<&TokenTree>;
     fn peek_many(&mut self, n: usize) -> &[TokenTree];
     fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree];
     fn peek_from(&mut self, at: usize) -> &[TokenTree];
+    fn skip(&mut self, n: usize);
 
     fn stringify(&mut self) -> String;
+    fn last_span(&self) -> Option<Span>;
+
+    fn err_eos(&self, expected: ErrorText) -> Error {
+        Error {
+            expected,
+            got: ErrorText::EndOfStream,
+            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
+            at: self.last_span().unwrap_or_else(Span::call_site),
+        }
+    }
 
     /// Returns whether or not there are any more tokens in the stream.
     fn is_empty(&mut self) -> bool {
@@ -153,9 +190,11 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
+        let last_span = self.last_span();
         StreamView {
             stream: self,
             skip: 0,
+            last_span,
         }
     }
 
@@ -165,7 +204,73 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
-        StreamView { stream: self, skip }
+        let last_span = self.last_span();
+        StreamView {
+            stream: self,
+            skip,
+            last_span,
+        }
+    }
+}
+
+impl<S: StreamLike + ?Sized> StreamLike for &mut S {
+    fn pop(&mut self) -> Option<TokenTree> {
+        (**self).pop()
+    }
+    fn peek(&mut self) -> Option<&TokenTree> {
+        (**self).peek()
+    }
+    fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
+        (**self).peek_nth(n)
+    }
+    fn peek_last(&mut self) -> Option<&TokenTree> {
+        (**self).peek_last()
+    }
+    fn peek_many(&mut self, n: usize) -> &[TokenTree] {
+        (**self).peek_many(n)
+    }
+    fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
+        (**self).peek_many_at(n, at)
+    }
+    fn peek_from(&mut self, at: usize) -> &[TokenTree] {
+        (**self).peek_from(at)
+    }
+    fn skip(&mut self, n: usize) {
+        (**self).skip(n)
+    }
+    fn stringify(&mut self) -> String {
+        (**self).stringify()
+    }
+    fn last_span(&self) -> Option<Span> {
+        (**self).last_span()
+    }
+    fn err_eos(&self, expected: ErrorText) -> Error {
+        (**self).err_eos(expected)
+    }
+    fn is_empty(&mut self) -> bool {
+        (**self).is_empty()
+    }
+    fn view(&mut self) -> StreamView<'_, Self>
+    where
+        Self: Sized,
+    {
+        let last_span = self.last_span();
+        StreamView {
+            stream: self,
+            skip: 0,
+            last_span,
+        }
+    }
+    fn view_from(&mut self, skip: usize) -> StreamView<'_, Self>
+    where
+        Self: Sized,
+    {
+        let last_span = self.last_span();
+        StreamView {
+            stream: self,
+            skip,
+            last_span,
+        }
     }
 }
 
@@ -198,14 +303,16 @@ impl Stream {
     fn contiguous_len(&self) -> usize {
         self.buffer.as_slices().0.len()
     }
+}
 
+impl StreamLike for Stream {
     /// Returns the next token in the stream, if any.
-    pub fn peek(&mut self) -> Option<&TokenTree> {
+    fn peek(&mut self) -> Option<&TokenTree> {
         self.peek_nth(0)
     }
 
     /// Returns the `n`th token in the stream, if any.
-    pub fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
+    fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
         if self.buffer.len() <= n {
             self.pull(n + 1);
         }
@@ -214,18 +321,18 @@ impl Stream {
     }
 
     /// Returns the last token in the stream, if any.
-    pub fn peek_last(&mut self) -> Option<&TokenTree> {
+    fn peek_last(&mut self) -> Option<&TokenTree> {
         self.pull(usize::MAX);
         self.buffer.back()
     }
 
     /// Returns the next `n` tokens in the stream, if any.
-    pub fn peek_many(&mut self, n: usize) -> &[TokenTree] {
+    fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.peek_many_at(n, 0)
     }
 
     /// Returns the next `n` tokens in the stream, starting at `at`, if any.
-    pub fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
+    fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
         if self.buffer.len() < (n + at) {
             self.pull(n + at);
         }
@@ -240,7 +347,7 @@ impl Stream {
     }
 
     /// Returns the last tokens in the stream, starting at `n`, if any.
-    pub fn peek_from(&mut self, at: usize) -> &[TokenTree] {
+    fn peek_from(&mut self, at: usize) -> &[TokenTree] {
         self.pull(usize::MAX);
         self.buffer.make_contiguous();
 
@@ -251,7 +358,7 @@ impl Stream {
     /// Consumes the next token in the stream, if any.
     ///
     /// Also updates [`Self::last_span`].
-    pub fn pop(&mut self) -> Option<TokenTree> {
+    fn pop(&mut self) -> Option<TokenTree> {
         if let Some(tt) = self.buffer.pop_front() {
             self.last_span = Some(tt.span());
             Some(tt)
@@ -261,7 +368,7 @@ impl Stream {
     }
 
     /// Skips the next `n` tokens.
-    pub fn skip(&mut self, n: usize) {
+    fn skip(&mut self, n: usize) {
         if self.buffer.len() < n {
             let rest = n - self.buffer.len();
             self.buffer.drain(..);
@@ -278,7 +385,7 @@ impl Stream {
     /// Note that it's impossible to get the span or source for a `TokenStream`,
     /// so this is lossy; it simply concatenates all the remaining tokens with a
     /// space between each one. This is purely for diagnostic purposes.
-    pub fn stringify(&mut self) -> String {
+    fn stringify(&mut self) -> String {
         self.pull(usize::MAX);
 
         let mut s = String::new();
@@ -291,22 +398,7 @@ impl Stream {
         s
     }
 
-    /// Returns a new sub-[view](StreamView) based on `self`.
-    pub fn view(&mut self) -> StreamView<'_, Self> {
-        StreamView {
-            stream: self,
-            skip: 0,
-        }
-    }
-
-    /// Returns a new sub-[view](StreamView) based on `self`, skipping the first
-    /// `skip` tokens.
-    pub fn view_from(&mut self, skip: usize) -> StreamView<'_, Self> {
-        StreamView { stream: self, skip }
-    }
-
-    /// Returns the span of the last token that was popped, if any.
-    pub fn last_span(&self) -> Option<Span> {
+    fn last_span(&self) -> Option<Span> {
         self.last_span
     }
 
@@ -318,10 +410,11 @@ impl Stream {
     ///
     /// `at` is not set if feature `proc-macro2` is enabled but not
     /// `proc-macro2-span-locations`.
-    pub fn err_eos(&self, expected: ErrorText) -> Error {
+    fn err_eos(&self, expected: ErrorText) -> Error {
         Error {
             expected,
             got: ErrorText::EndOfStream,
+            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
             at: self.last_span().unwrap_or_else(Span::call_site),
         }
     }
@@ -332,6 +425,7 @@ impl Stream {
 pub struct StreamView<'a, S> {
     stream: &'a mut S,
     skip: usize,
+    last_span: Option<Span>,
 }
 
 impl<S: StreamLike> StreamView<'_, S> {
@@ -344,43 +438,45 @@ impl<S: StreamLike> StreamView<'_, S> {
     ///
     /// See also [`Self::reset_skip_to`].
     pub fn reset_skip(&mut self) {
-        self.reset_skip_to(0);
+        self.skip = 0;
     }
+}
 
-    /// Un-skips any skipped tokens, then skips `n`.
-    ///
-    /// See also [`Self::reset_skip`] and [`Self::skip`].
-    pub fn reset_skip_to(&mut self, n: usize) {
-        self.skip = n;
+impl<S: StreamLike> StreamLike for StreamView<'_, S> {
+    fn pop(&mut self) -> Option<TokenTree> {
+        let tt = self.peek()?.clone();
+        self.skip(1);
+        self.last_span = Some(tt.span());
+        Some(tt)
     }
 
     /// Skips `n` tokens.
-    pub fn skip(&mut self, n: usize) {
+    fn skip(&mut self, n: usize) {
         self.skip += n;
     }
 
     /// See [`Stream::peek`].
-    pub fn peek(&mut self) -> Option<&TokenTree> {
+    fn peek(&mut self) -> Option<&TokenTree> {
         self.stream.peek_nth(self.skip)
     }
 
     /// See [`Stream::peek_nth`].
-    pub fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
+    fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
         self.stream.peek_nth(n + self.skip)
     }
 
     /// See [`Stream::peek_last`].
-    pub fn peek_last(&mut self) -> Option<&TokenTree> {
+    fn peek_last(&mut self) -> Option<&TokenTree> {
         self.stream.peek_last()
     }
 
     /// See [`Stream::peek_many`].
-    pub fn peek_many(&mut self, n: usize) -> &[TokenTree] {
+    fn peek_many(&mut self, n: usize) -> &[TokenTree] {
         self.stream.peek_many_at(n, self.skip)
     }
 
     /// See [`Stream::peek_many_at`].
-    pub fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
+    fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
         self.stream.peek_many_at(n, at + self.skip)
     }
 
@@ -390,7 +486,7 @@ impl<S: StreamLike> StreamView<'_, S> {
     }
 
     /// See [`Stream::stringify`].
-    pub fn stringify(&mut self) -> String {
+    fn stringify(&mut self) -> String {
         let mut s = String::new();
         for tt in self.peek_from(self.skip) {
             if !s.is_empty() {
@@ -401,65 +497,7 @@ impl<S: StreamLike> StreamView<'_, S> {
         s
     }
 
-    /// See [`Stream::peek_many_at`].
-    pub fn view(&mut self) -> StreamView<'_, Self> {
-        StreamView {
-            stream: self,
-            skip: 0,
-        }
-    }
-
-    /// Returns a new sub-[view](StreamView) based on `self`, skipping the first
-    /// `skip` tokens.
-    pub fn view_from(&mut self, skip: usize) -> StreamView<'_, Self> {
-        StreamView { stream: self, skip }
-    }
-}
-
-impl StreamLike for Stream {
-    fn peek(&mut self) -> Option<&TokenTree> {
-        self.peek()
-    }
-    fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
-        self.peek_nth(n)
-    }
-    fn peek_last(&mut self) -> Option<&TokenTree> {
-        self.peek_last()
-    }
-    fn peek_many(&mut self, n: usize) -> &[TokenTree] {
-        self.peek_many(n)
-    }
-    fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
-        self.peek_many_at(n, at)
-    }
-    fn peek_from(&mut self, at: usize) -> &[TokenTree] {
-        self.peek_from(at)
-    }
-    fn stringify(&mut self) -> String {
-        self.stringify()
-    }
-}
-
-impl<S: StreamLike> StreamLike for StreamView<'_, S> {
-    fn peek(&mut self) -> Option<&TokenTree> {
-        self.peek()
-    }
-    fn peek_nth(&mut self, n: usize) -> Option<&TokenTree> {
-        self.peek_nth(n)
-    }
-    fn peek_last(&mut self) -> Option<&TokenTree> {
-        self.peek_last()
-    }
-    fn peek_many(&mut self, n: usize) -> &[TokenTree] {
-        self.peek_many(n)
-    }
-    fn peek_many_at(&mut self, n: usize, at: usize) -> &[TokenTree] {
-        self.peek_many_at(n, at)
-    }
-    fn peek_from(&mut self, at: usize) -> &[TokenTree] {
-        self.peek_from(at)
-    }
-    fn stringify(&mut self) -> String {
-        self.stringify()
+    fn last_span(&self) -> Option<Span> {
+        self.last_span
     }
 }

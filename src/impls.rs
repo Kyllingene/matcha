@@ -1,9 +1,14 @@
 use crate::procmacro::TokenTree;
-use crate::{Error, ErrorText, DiagDisplay, FromStream, MatchStream, Stream, StreamLike, StreamView};
+use crate::{
+    DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView,
+};
 
 impl FromStream for TokenTree {
     type Output = Self;
-    fn from_stream(stream: &mut Stream) -> Result<Self, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
+    where
+        S: StreamLike,
+    {
         stream.pop().ok_or(stream.err_eos(ErrorText::Token))
     }
 }
@@ -55,8 +60,28 @@ where
     T: FromStream,
 {
     type Output = Option<T::Output>;
-    fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
         Ok(T::from_stream(stream).ok())
+    }
+}
+
+impl<T, const N: usize> FromStream for [T; N]
+where
+    T: FromStream,
+{
+    type Output = [T::Output; N];
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
+        let mut this = [const { None }; N];
+        for item in &mut this {
+            *item = Some(T::from_stream(stream)?);
+        }
+        Ok(this.map(|i| i.unwrap()))
     }
 }
 
@@ -65,7 +90,10 @@ where
     T: FromStream,
 {
     type Output = Vec<T::Output>;
-    fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
         let mut vec = Vec::new();
         while let Ok(item) = T::from_stream(stream) {
             vec.push(item);
@@ -169,7 +197,8 @@ macro_rules! impl_tuple {
         {
             type Output = ($($t::Output,)+);
 
-            fn from_stream(stream: &mut Stream) -> Result<Self::Output, Error> {
+            fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+where S: StreamLike, {
                 Ok(($(
                     $t::from_stream(stream)?,
                 )+))
