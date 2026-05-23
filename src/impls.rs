@@ -64,7 +64,11 @@ where
     where
         S: StreamLike,
     {
-        Ok(T::from_stream(stream).ok())
+        match T::from_stream(stream) {
+            Ok(x) => Ok(Some(x)),
+            Err(e) if err.fatal => return Err(e),
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -95,7 +99,8 @@ where
         S: StreamLike,
     {
         let mut vec = Vec::new();
-        while let Ok(item) = T::from_stream(stream) {
+        // Option handles fatal errors for us
+        while let Some(item) = Option::<T>::from_stream(stream) {
             vec.push(item);
         }
         Ok(vec)

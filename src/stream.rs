@@ -34,6 +34,12 @@ pub struct Error {
     /// The found data.
     pub got: ErrorText,
 
+    /// Whether or not the error is recoverable.
+    ///
+    /// If `true`, you *must* bubble it up. You are not allowed to try another
+    /// parsing path.
+    pub fatal: bool,
+
     /// The start location at which the error was encountered.
     ///
     /// If that location isn't available, you should default to
@@ -60,9 +66,19 @@ impl Error {
         Self {
             expected,
             got,
+            fatal: false,
             #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
             at,
         }
+    }
+
+    /// Flags this error as fatal.
+    ///
+    /// Fatal errors must not be recovered from. If you encounter a fatal error,
+    /// you must return it untouched.
+    pub const fn fatal(mut self) -> Self {
+        self.fatal = true;
+        self
     }
 }
 
@@ -104,6 +120,11 @@ pub trait FromStream {
     type Output: Sized;
 
     /// Attempt to parse the type from the stream.
+    ///
+    /// Note that you must respect [`Error::fatal`] from children. If a fatal
+    /// error is encountered at any point, it must be bubbled up untouched. It
+    /// is a logic error to recover from a fatal error, and will likely break
+    /// downstream and/or upstream code.
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
         S: StreamLike;
@@ -171,10 +192,19 @@ pub trait StreamLike {
     fn stringify(&mut self) -> String;
     fn last_span(&self) -> Option<Span>;
 
+    /// Creates a new [`Error`] with <code>got: [ErrorText::EndOfStream]</code>.
+    ///
+    ///
+    /// `at` is set the <code>self.[last_span](Self::last_span)()</code>.
+    /// If `self.last_span()` is `None`, defaults to [`Span::call_site`].
+    ///
+    /// `at` is not set if feature `proc-macro2` is enabled but not
+    /// `proc-macro2-span-locations`.
     fn err_eos(&self, expected: ErrorText) -> Error {
         Error {
             expected,
             got: ErrorText::EndOfStream,
+            fatal: false,
             #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
             at: self.last_span().unwrap_or_else(Span::call_site),
         }
@@ -401,23 +431,6 @@ impl StreamLike for Stream {
     fn last_span(&self) -> Option<Span> {
         self.last_span
     }
-
-    /// Creates a new [`Error`] with <code>got: [ErrorText::EndOfStream]</code>.
-    ///
-    ///
-    /// `at` is set the <code>self.[last_span](Self::last_span)()</code>.
-    /// If `self.last_span()` is `None`, defaults to [`Span::call_site`].
-    ///
-    /// `at` is not set if feature `proc-macro2` is enabled but not
-    /// `proc-macro2-span-locations`.
-    fn err_eos(&self, expected: ErrorText) -> Error {
-        Error {
-            expected,
-            got: ErrorText::EndOfStream,
-            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
-            at: self.last_span().unwrap_or_else(Span::call_site),
-        }
-    }
 }
 
 /// A view into a [`Stream`] that's allowed to pull into its buffer, but not
@@ -435,8 +448,6 @@ impl<S: StreamLike> StreamView<'_, S> {
     }
 
     /// Un-skips any tokens that have been skipped.
-    ///
-    /// See also [`Self::reset_skip_to`].
     pub fn reset_skip(&mut self) {
         self.skip = 0;
     }

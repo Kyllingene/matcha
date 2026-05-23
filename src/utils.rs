@@ -238,6 +238,21 @@ impl FromStream for Brackets {
     }
 }
 
+/// A helper for committing to a parse tree.
+///
+/// Turns all subsequent parse errors into fatal ones.
+pub struct Cut<T>(pub T);
+
+impl<T: FromStream> FromStream for Cut<T> {
+    type Output = T::Output;
+    fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
+    where
+        S: StreamLike,
+    {
+        T::from_stream(stream).map_err(Error::fatal)
+    }
+}
+
 /// A helper for parsing a series of items.
 ///
 /// Parses a series of items (`T`), separated by delimiters (`D`), with an
@@ -257,15 +272,16 @@ impl<T: FromStream, D: FromStream> FromStream for Delimited<T, D> {
         S: StreamLike,
     {
         let mut items = Vec::new();
-
-        while let Ok(item) = T::from_stream(stream) {
+        // Option handles fatal errors for us
+        while let Some(item) = Option::<T>::from_stream(stream)? {
             items.push(item);
 
-            if D::from_stream(stream).is_err() {
-                break;
+            match D::from_stream(stream) {
+                Ok(_) => {}
+                Err(e) if err.fatal => return Err(e),
+                Err(_) => break,
             }
         }
-
         Ok(items)
     }
 }

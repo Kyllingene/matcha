@@ -172,6 +172,7 @@ macro_rules! __compose_inner {
                         stream.skip(skipped);
                         return Ok(Self::$variant_name(x));
                     }
+                    Err(e) if e.fatal => return Err(e),
                     Err(e) => {
                         err = e;
                         view.reset_skip();
