@@ -1,7 +1,5 @@
 use crate::procmacro::TokenTree;
-use crate::{
-    DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView,
-};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 impl FromStream for TokenTree {
     type Output = Self;
@@ -66,7 +64,7 @@ where
     {
         match T::from_stream(stream) {
             Ok(x) => Ok(Some(x)),
-            Err(e) if err.fatal => return Err(e),
+            Err(e) if e.fatal => return Err(e),
             Err(_) => Ok(None),
         }
     }
@@ -100,7 +98,7 @@ where
     {
         let mut vec = Vec::new();
         // Option handles fatal errors for us
-        while let Some(item) = Option::<T>::from_stream(stream) {
+        while let Some(item) = Option::<T>::from_stream(stream)? {
             vec.push(item);
         }
         Ok(vec)

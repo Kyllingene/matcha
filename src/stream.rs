@@ -56,13 +56,11 @@ impl Error {
     ///
     /// If feature `proc-macro2` is enabled but not
     /// `proc-macro2-span-locations`, ignores `at`.
-    #[cfg_attr(all(not(feature = "proc-macro2-span-locations"), feature = "proc-macro2"),
-        expect(unused_variables, reason = "`at` isn't used without span locations"))]
-    pub const fn new(
-        expected: ErrorText,
-        got: ErrorText,
-        at: Span,
-    ) -> Self {
+    #[cfg_attr(
+        all(not(feature = "proc-macro2-span-locations"), feature = "proc-macro2"),
+        expect(unused_variables, reason = "`at` isn't used without span locations")
+    )]
+    pub const fn new(expected: ErrorText, got: ErrorText, at: Span) -> Self {
         Self {
             expected,
             got,
