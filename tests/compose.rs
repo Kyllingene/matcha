@@ -27,15 +27,13 @@ compose! {
 }
 
 #[test]
-fn compose_struct() -> Result<(), Error> {
+fn compose_struct() {
     let s = "foo: 1 2 3";
     let input = s.parse::<TokenStream>().expect("invalid test input");
 
-    let foo = Foo::<Literal<'static>, 3>::from_stream(&mut Stream::from(input))?;
+    let foo = Foo::<Literal<'static>, 3>::from_stream(&mut Stream::from(input)).unwrap();
     assert_eq!(foo.x.0, "foo");
     assert_eq!(foo.y, [Literal("1"), Literal("2"), Literal("3"),]);
-
-    Ok(())
 }
 
 #[test]

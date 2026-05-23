@@ -34,6 +34,6 @@ pub use stream::{
     DiagDisplay, Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView,
 };
 pub use utils::{
-    Braces, Brackets, Cut, Delimited, Greedy, Group, GroupKind, Ident, Literal, Maybe, Parens,
+    Braces, Brackets, Cut, Delimited, Greedy, Group, GroupKind, Ident, Literal, Maybe, Neg, Parens,
     Punct, punct,
 };
