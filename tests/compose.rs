@@ -7,14 +7,29 @@ compose! {
     #[derive(Debug, Clone, PartialEq)]
     pub struct Foo<T, !const N: usize>
     where [
-        T: FromStream,
+        T: FromStream<Output = T>,
         T::Output: std::fmt::Debug + Clone + std::cmp::PartialEq,
     ] {
         x: Ident,
         = punct::Colon,
         ;^,
         y: [T; N],
+        z: Option<Ident> as Option<Group> => { foo_z(z)? },
     }
+}
+
+fn foo_z(input: Option<Group>) -> Result<Option<Ident>, Error> {
+    let Some(group) = input else {
+        return Ok(None);
+    };
+
+    let mut stream = Stream::from(group.inner);
+    decompose! {
+        stream;
+        name: Ident;
+    }
+
+    Ok(Some(name))
 }
 
 compose! {
@@ -28,7 +43,7 @@ compose! {
 
 #[test]
 fn compose_struct() {
-    let s = "foo: 1 2 3";
+    let s = "foo: 1 2 3 (bar)";
     let input = s.parse::<TokenStream>().expect("invalid test input");
 
     let foo = Foo::<Literal, 3>::from_stream(&mut Stream::from(input)).unwrap();
@@ -37,6 +52,7 @@ fn compose_struct() {
     for (x, y) in foo.y.iter().zip(["1", "2", "3"]) {
         assert_eq!(x, y);
     }
+    assert_eq!(foo.z.unwrap(), "bar");
 }
 
 #[test]
@@ -58,6 +74,7 @@ fn compose_enum() {
         Bar::A(Foo {
             x: Ident { ident: "foo".into(), span: proc_macro2::Span::call_site() },
             y: [lit("1"), lit("2"), lit("3")],
+            z: None,
         })
     );
     assert_eq!(b2, Bar::B(Ident { ident: "bar".into(), span: proc_macro2::Span::call_site() }));

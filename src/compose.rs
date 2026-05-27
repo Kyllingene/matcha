@@ -1,7 +1,15 @@
 /// Implement [`FromStream`](crate::FromStream) for a struct or enum.
 ///
-/// Note that each field's actual type is `<T as FromStream>::Output`, *not* `T`
-/// itself.
+/// Note that each field must implement `FromStream<Output = Self>`. If you want
+/// to use a type implementing `FromStream<Output = Other>`, use the syntax
+/// `name: Other as Type`, where `Other` is the field type and `Type` is the
+/// type implementing `FromStream`.
+///
+/// You can map fields using the syntax `name: Type as OtherType => { ... }`.
+/// In this example, `Type` is the final type of the field (that needn't
+/// implement `FromStream`), `OtherType` is a type implementing `FromStream`,
+/// and inside the block is code converting `OtherType` (bound to `name`) into
+/// `Type`.
 ///
 /// Among the fields, you can also use `= expr` to match a literal expression
 /// implementing [`MatchStream`](crate::MatchStream). You can also use what I
@@ -29,6 +37,7 @@ macro_rules! __compose_inner {
             $(
                 $(#[$field_attrs:meta])*
                 $field_v:vis $field_name:ident : $field_type:ty
+                    $(as $field_map_type:ty $( => {$( $field_map:tt )*} )?)?
             )?
             $( = $match_expr:expr )?
             $( ; ^ $(@@ $cut:tt)? )?
@@ -47,6 +56,7 @@ macro_rules! __compose_inner {
                 $(
                     $(#[$field_attrs])*
                     $field_v $field_name : $field_type
+                        $(as $field_map_type $( => {$( $field_map )*} )?)?
                 )?
                 $( = $match_expr )?
                 $( ; ^ $($cut)? )?
@@ -67,6 +77,7 @@ macro_rules! __compose_inner {
             $(
                 $(#[$field_attrs:meta])*
                 $field_v:vis $field_name:ident : $field_type:ty
+                    $(as $field_map_type:ty $( => {$( $field_map:tt )*})?)?
             )?
             $( = $match_expr:expr )?
             $( ; ^ $(@@ $cut:tt)? )?
@@ -83,7 +94,7 @@ macro_rules! __compose_inner {
         { $(
             $(
                 $(#[$field_attrs])*
-                $field_v $field_name : <$field_type as $crate::FromStream>::Output,
+                $field_v $field_name : $field_type,
             )?
         )+ }
 
@@ -112,10 +123,12 @@ macro_rules! __compose_inner {
 
                 $(
                     $( ^; $($cut:tt)? )?
-                    $( $field_name: $field_type; )?
+                    $( $field_name: $crate::__if_else!([$($field_map_type)?] else [$field_type]); )?
                     $( = $match_expr; )?
                 )+
                 }
+
+                $($($($( let $field_name = { $($field_map)* }; )?)?)?)+
 
                 Ok(Self {$($($field_name,)?)+})
             }
@@ -190,4 +203,11 @@ macro_rules! __compose_inner {
             }
         }
     };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __if_else {
+    ([] else [$($t:tt)*]) => ($($t)*);
+    ([$($t:tt)*] else [$($_:tt)*]) => ($($t)*);
 }
