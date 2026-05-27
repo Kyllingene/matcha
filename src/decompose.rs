@@ -131,7 +131,7 @@ macro_rules! __decompose_inner {
         $(
             let group = <$crate::Parens as $crate::FromStream>::from_stream(&mut $input_stream)
                 .map_err(|e| e.with_fatal(cut))?;
-            let mut stream = $crate::Stream::from(group.inner);
+            let mut stream = $crate::Stream::from(group);
             $crate::__decompose_inner! {
                 stream;
 
@@ -142,7 +142,7 @@ macro_rules! __decompose_inner {
         $(
             let group = <$crate::Braces as $crate::FromStream>::from_stream(&mut $input_stream)
                 .map_err(|e| e.with_fatal(cut))?;
-            let mut stream = $crate::Stream::from(group.inner);
+            let mut stream = $crate::Stream::from(group);
             $crate::__decompose_inner! {
                 stream;
 
@@ -153,7 +153,7 @@ macro_rules! __decompose_inner {
         $(
             let group = <$crate::Brackets as $crate::FromStream>::from_stream(&mut $input_stream)
                 .map_err(|e| e.with_fatal(cut))?;
-            let mut stream = $crate::Stream::from(group.inner);
+            let mut stream = $crate::Stream::from(group);
             $crate::__decompose_inner! {
                 stream;
 
