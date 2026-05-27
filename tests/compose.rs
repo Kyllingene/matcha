@@ -68,16 +68,28 @@ fn compose_enum() {
         Bar::from_stream(&mut Stream::from(i5)),
     );
 
-    let lit = |s: &str| Literal { literal: s.into(), span: proc_macro2::Span::call_site() };
+    let lit = |s: &str| Literal {
+        literal: s.into(),
+        span: proc_macro2::Span::call_site(),
+    };
     assert_eq!(
         b1,
         Bar::A(Foo {
-            x: Ident { ident: "foo".into(), span: proc_macro2::Span::call_site() },
+            x: Ident {
+                ident: "foo".into(),
+                span: proc_macro2::Span::call_site()
+            },
             y: [lit("1"), lit("2"), lit("3")],
             z: None,
         })
     );
-    assert_eq!(b2, Bar::B(Ident { ident: "bar".into(), span: proc_macro2::Span::call_site() }));
+    assert_eq!(
+        b2,
+        Bar::B(Ident {
+            ident: "bar".into(),
+            span: proc_macro2::Span::call_site()
+        })
+    );
     assert_eq!(b3, Bar::C(punct::Semicolon));
 
     assert!(!b4.unwrap_err().fatal);

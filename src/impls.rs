@@ -83,11 +83,7 @@ impl MatchStream for str {
         S: StreamLike,
     {
         let tt = stream.peek().ok_or(None)?.to_string();
-        if tt == self {
-            Ok(1)
-        } else {
-            Err(Some(tt))
-        }
+        if tt == self { Ok(1) } else { Err(Some(tt)) }
     }
 }
 

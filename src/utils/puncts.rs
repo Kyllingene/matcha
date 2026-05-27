@@ -1,4 +1,4 @@
-use crate::procmacro::{TokenTree, Span};
+use crate::procmacro::{Span, TokenTree};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// A piece of punctuation (e.g. `!`, `.`, `:`).
@@ -70,7 +70,10 @@ impl DiagDisplay for Punct {
 impl quote::ToTokens for Punct {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         use quote::TokenStreamExt;
-        stream.append(proc_macro2::Punct::new(self.ch, proc_macro2::Spacing::Alone));
+        stream.append(proc_macro2::Punct::new(
+            self.ch,
+            proc_macro2::Spacing::Alone,
+        ));
     }
 }
 
@@ -183,7 +186,7 @@ pub mod punct {
                 $( if $p != '\'' {
                     let mut s = String::new();
                     s.push($p);
-                    
+
                     let Ok(tts) = proc_macro2::TokenStream::from_str(&s) else {
                         panic!(concat!("failed to parse on ", stringify!($name)));
                     };

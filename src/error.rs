@@ -1,4 +1,4 @@
-use crate::procmacro::{TokenStream, Span};
+use crate::procmacro::{Span, TokenStream};
 
 /// The text for an [`Error`].
 #[derive(Debug, Clone)]

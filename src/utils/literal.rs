@@ -67,11 +67,9 @@ impl DiagDisplay for Literal {
 #[cfg(feature = "quote")]
 impl quote::ToTokens for Literal {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
-        use quote::TokenStreamExt;
         use core::str::FromStr;
-        let mut tt = proc_macro2::Literal::from_str(
-            &self.literal,
-        ).expect("invalid literal");
+        use quote::TokenStreamExt;
+        let mut tt = proc_macro2::Literal::from_str(&self.literal).expect("invalid literal");
         tt.set_span(self.span);
         stream.append(tt);
     }

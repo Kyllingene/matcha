@@ -1,4 +1,4 @@
-use crate::procmacro::{Delimiter, TokenStream, TokenTree, Span};
+use crate::procmacro::{Delimiter, Span, TokenStream, TokenTree};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// The delimiters used by a [`Group`].
@@ -184,17 +184,25 @@ impl FromStream for Parens {
                     ErrorText::Backticks("(".into()),
                     ErrorText::Backticks("{".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::Bracket => Err(Error::new(
                     ErrorText::Backticks("(".into()),
                     ErrorText::Backticks("[".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::None => unreachable!(),
             }
@@ -237,17 +245,25 @@ impl FromStream for Braces {
                     ErrorText::Backticks("{".into()),
                     ErrorText::Backticks("(".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::Bracket => Err(Error::new(
                     ErrorText::Backticks("{".into()),
                     ErrorText::Backticks("[".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::None => unreachable!(),
             }
@@ -290,17 +306,25 @@ impl FromStream for Brackets {
                     ErrorText::Backticks("[".into()),
                     ErrorText::Backticks("(".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::Brace => Err(Error::new(
                     ErrorText::Backticks("[".into()),
                     ErrorText::Backticks("{".into()),
                     #[cfg(feature = "proc-macro2")]
-                    { g.span_open() },
+                    {
+                        g.span_open()
+                    },
                     #[cfg(not(feature = "proc-macro2"))]
-                    { tok.start() },
+                    {
+                        tok.start()
+                    },
                 )),
                 Delimiter::None => unreachable!(),
             }

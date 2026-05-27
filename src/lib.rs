@@ -55,7 +55,7 @@ pub use utils::{
 /// # }
 /// ```
 pub fn error(msg: impl AsRef<str>, span: procmacro::Span) -> procmacro::TokenStream {
-    use procmacro::{TokenStream, TokenTree, Ident, Spacing, Literal, Punct, Group, Delimiter};
+    use procmacro::{Delimiter, Group, Ident, Literal, Punct, Spacing, TokenStream, TokenTree};
 
     let mut ident = Ident::new("compile_error", span);
     ident.set_span(span);

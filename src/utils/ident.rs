@@ -78,10 +78,7 @@ impl DiagDisplay for Ident {
 impl quote::ToTokens for Ident {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         use quote::TokenStreamExt;
-        stream.append(proc_macro2::Ident::new(
-            &self.ident,
-            self.span,
-        ));
+        stream.append(proc_macro2::Ident::new(&self.ident, self.span));
     }
 }
 

@@ -27,5 +27,12 @@ fn main() {
     let mut inner = Stream::from(Group::from_stream(&mut stream).unwrap().inner);
     let _ = Greedy::<TokenTree>::from_stream(&mut inner).unwrap();
 
-    assert_eq!(Maybe(Punct { ch: ':', span: proc_macro2::Span::call_site() }).match_stream(stream.view()), Ok(0));
+    assert_eq!(
+        Maybe(Punct {
+            ch: ':',
+            span: proc_macro2::Span::call_site()
+        })
+        .match_stream(stream.view()),
+        Ok(0)
+    );
 }
