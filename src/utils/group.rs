@@ -40,7 +40,26 @@ pub struct Group {
     /// The inner tokens, not including the delimiters.
     pub inner: TokenStream,
     /// The whole span of the original group.
+    ///
+    /// ```
+    /// ( ... )
+    /// ^^^^^^^
+    /// ```
     pub span: Span,
+    /// The span of the opening delimiter.
+    ///
+    /// ```
+    /// ( ... )
+    /// ^
+    /// ```
+    pub span_open: Span,
+    /// The span of the closing delimiter.
+    ///
+    /// ```
+    /// ( ... )
+    ///       ^
+    /// ```
+    pub span_close: Span,
 }
 
 #[cfg(feature = "quote")]
@@ -68,6 +87,8 @@ impl From<crate::procmacro::Group> for Group {
             kind: g.delimiter().into(),
             inner: g.stream(),
             span: g.span(),
+            span_open: g.span_open(),
+            span_close: g.span_close(),
         }
     }
 }
@@ -78,6 +99,8 @@ impl From<&crate::procmacro::Group> for Group {
             kind: g.delimiter().into(),
             inner: g.stream(),
             span: g.span(),
+            span_open: g.span_open(),
+            span_close: g.span_close(),
         }
     }
 }
@@ -179,16 +202,18 @@ impl FromStream for Parens {
                     kind: GroupKind::Paren,
                     inner: g.stream(),
                     span: g.span(),
+                    span_open: g.span_open(),
+                    span_close: g.span_close(),
                 }),
                 Delimiter::Brace => Err(Error::new(
                     ErrorText::Backticks("(".into()),
                     ErrorText::Backticks("{".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::Bracket => Err(Error::new(
                     ErrorText::Backticks("(".into()),
                     ErrorText::Backticks("[".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::None => unreachable!(),
             }
@@ -226,16 +251,18 @@ impl FromStream for Braces {
                     kind: GroupKind::Bracket,
                     inner: g.stream(),
                     span: g.span(),
+                    span_open: g.span_open(),
+                    span_close: g.span_close(),
                 }),
                 Delimiter::Parenthesis => Err(Error::new(
                     ErrorText::Backticks("{".into()),
                     ErrorText::Backticks("(".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::Bracket => Err(Error::new(
                     ErrorText::Backticks("{".into()),
                     ErrorText::Backticks("[".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::None => unreachable!(),
             }
@@ -273,16 +300,18 @@ impl FromStream for Brackets {
                     kind: GroupKind::Bracket,
                     inner: g.stream(),
                     span: g.span(),
+                    span_open: g.span_open(),
+                    span_close: g.span_close(),
                 }),
                 Delimiter::Parenthesis => Err(Error::new(
                     ErrorText::Backticks("[".into()),
                     ErrorText::Backticks("(".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::Brace => Err(Error::new(
                     ErrorText::Backticks("[".into()),
                     ErrorText::Backticks("{".into()),
-                    g.span_open()
+                    g.span_open(),
                 )),
                 Delimiter::None => unreachable!(),
             }
