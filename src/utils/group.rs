@@ -172,13 +172,32 @@ impl FromStream for Parens {
         };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() == Delimiter::Parenthesis
+            && g.delimiter() != Delimiter::None
         {
-            Ok(Group {
-                kind: GroupKind::Paren,
-                inner: g.stream(),
-                span: g.span(),
-            })
+            match g.delimiter() {
+                Delimiter::Parenthesis => Ok(Group {
+                    kind: GroupKind::Paren,
+                    inner: g.stream(),
+                    span: g.span(),
+                }),
+                Delimiter::Brace => Err(Error::new(
+                    ErrorText::Backticks("(".into()),
+                    ErrorText::Backticks("{".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::Bracket => Err(Error::new(
+                    ErrorText::Backticks("(".into()),
+                    ErrorText::Backticks("[".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::None => unreachable!(),
+            }
         } else {
             return Err(Error::new(
                 ErrorText::Backticks("(".into()),
@@ -206,13 +225,32 @@ impl FromStream for Braces {
         };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() == Delimiter::Brace
+            && g.delimiter() != Delimiter::None
         {
-            Ok(Group {
-                kind: GroupKind::Brace,
-                inner: g.stream(),
-                span: g.span(),
-            })
+            match g.delimiter() {
+                Delimiter::Brace => Ok(Group {
+                    kind: GroupKind::Bracket,
+                    inner: g.stream(),
+                    span: g.span(),
+                }),
+                Delimiter::Parenthesis => Err(Error::new(
+                    ErrorText::Backticks("{".into()),
+                    ErrorText::Backticks("(".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::Bracket => Err(Error::new(
+                    ErrorText::Backticks("{".into()),
+                    ErrorText::Backticks("[".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::None => unreachable!(),
+            }
         } else {
             return Err(Error::new(
                 ErrorText::Backticks("{".into()),
@@ -240,13 +278,32 @@ impl FromStream for Brackets {
         };
         let span = tok.span();
         let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() == Delimiter::Bracket
+            && g.delimiter() != Delimiter::None
         {
-            Ok(Group {
-                kind: GroupKind::Bracket,
-                inner: g.stream(),
-                span: g.span(),
-            })
+            match g.delimiter() {
+                Delimiter::Bracket => Ok(Group {
+                    kind: GroupKind::Bracket,
+                    inner: g.stream(),
+                    span: g.span(),
+                }),
+                Delimiter::Parenthesis => Err(Error::new(
+                    ErrorText::Backticks("[".into()),
+                    ErrorText::Backticks("(".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::Brace => Err(Error::new(
+                    ErrorText::Backticks("[".into()),
+                    ErrorText::Backticks("{".into()),
+                    #[cfg(feature = "proc-macro2")]
+                    { g.span_open() },
+                    #[cfg(not(feature = "proc-macro2"))]
+                    { tok.start() },
+                )),
+                Delimiter::None => unreachable!(),
+            }
         } else {
             return Err(Error::new(
                 ErrorText::Backticks("[".into()),
