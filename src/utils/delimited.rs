@@ -6,7 +6,7 @@ use crate::{Error, FromStream, StreamLike};
 /// optional trailing delimiter.
 ///
 /// Note that this doesn't parse any brackets around the items; for example, if
-/// you want to parse a tuple, you'd need to layer [`Parens`].
+/// you want to parse a tuple, you'd need to layer [`Parens`](crate::Parens).
 pub struct Delimited<T, D> {
     _items: core::marker::PhantomData<T>,
     _delimiter: core::marker::PhantomData<D>,

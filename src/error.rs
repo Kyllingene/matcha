@@ -24,7 +24,7 @@ impl core::fmt::Display for ErrorText {
     }
 }
 
-/// An error that occured during parsing a [`Stream`].
+/// An error that occured during parsing a [`Stream`](crate::Stream).
 #[derive(Debug, Clone)]
 pub struct Error {
     /// The expected data.
