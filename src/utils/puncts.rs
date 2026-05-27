@@ -173,7 +173,35 @@ pub mod punct {
                     write!(f, "{self}")
                 }
             }
-        )+};
+        )+
+
+            #[cfg(test)]
+            #[test]
+            fn all_valid_puncts() {
+                use std::str::FromStr;
+
+                $( if $p != '\'' {
+                    let mut s = String::new();
+                    s.push($p);
+                    
+                    let Ok(tts) = proc_macro2::TokenStream::from_str(&s) else {
+                        panic!(concat!("failed to parse on ", stringify!($name)));
+                    };
+                    let mut stream = crate::Stream::from(tts);
+                    if let Err(e) = $name::from_stream(&mut stream) {
+                        panic!(concat!("failed to parse on ", stringify!($name), ": {}"), e);
+                    }
+                } )+
+
+                let Ok(tts) = proc_macro2::TokenStream::from_str("'a") else {
+                    panic!("failed to parse on Apos");
+                };
+                let mut stream = crate::Stream::from(tts);
+                if let Err(e) = Apos::from_stream(&mut stream) {
+                    panic!("failed to parse on Apos: {e}");
+                }
+            }
+        };
     }
 
     impl_punct! {
@@ -181,17 +209,14 @@ pub mod punct {
         Bar: '|' = "a pipe (`|`)",
         Colon: ':' = "a colon (`:`)",
         Semicolon: ';' = "a semicolon (`;`)",
-        Quote: '"' = "a quote (`\"`)",
-        Apos: '\'' = "an apostrophe (`'`)",
+        Apos: '\'' = "an apostrophe (`'`) (only valid before an [identifier](crate::Ident))",
         Comma: ',' = "a comma (`,`)",
         Less: '<' = "a left angle bracket (`<`)",
         Period: '.' = "a period (`.`)",
         Greater: '>' = "a right angle bracket (`>`)",
-        Backslash: '\\' = "a backslash (`\\`)",
         Question: '?' = "a question mark (`?`)",
 
         Tilde: '~' = "a tilde (`~`)",
-        Backtick: '`' = "a backtick (`` ` ``)",
         Bang: '!' = "an exclamation mark (`!`)",
         At: '@' = "an at symbol (`@`)",
         Hash: '#' = "a pound sign (`#`)",
@@ -202,7 +227,6 @@ pub mod punct {
         Star: '*' = "an asterisk (`*`)",
 
         Dash: '-' = "a minus sign (`-`)",
-        Underscore: '_' = "an underscore (`_`)",
         Plus: '+' = "a plus sign (`+`)",
         Equals: '=' = "an equals sign (`=`)",
     }
