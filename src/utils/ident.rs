@@ -2,13 +2,14 @@ use crate::procmacro::{Span, TokenTree};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// An identifier.
-///
-/// When parsed out of a stream, returns a `'static` ident, from a leaked
-/// `String`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Ident<'a>(pub &'a str);
+#[allow(missing_docs)]
+#[derive(Debug, Clone)]
+pub struct Ident {
+    pub ident: String,
+    pub span: Span,
+}
 
-impl FromStream for Ident<'static> {
+impl FromStream for Ident {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
@@ -21,9 +22,10 @@ impl FromStream for Ident<'static> {
             }
         };
         if let TokenTree::Ident(i) = tok {
-            let s = i.to_string().leak();
+            let ident = i.to_string();
+            let span = i.span();
             stream.pop();
-            Ok(Self(s))
+            Ok(Self { ident, span })
         } else {
             Err(Error::new(
                 ErrorText::Plain("ident".into()),
@@ -34,41 +36,80 @@ impl FromStream for Ident<'static> {
     }
 }
 
-impl MatchStream for Ident<'_> {
+impl MatchStream for Ident {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Ident(i) = tok {
-            (&*i.to_string() == self.0)
-                .then_some(1)
-                .ok_or_else(|| Some(tok.to_string()))
+            #[cfg(feature = "proc-macro2")]
+            {
+                (*i == self.ident)
+                    .then_some(1)
+                    .ok_or_else(|| Some(tok.to_string()))
+            }
+
+            #[cfg(not(feature = "proc-macro2"))]
+            {
+                (i.to_string() == self.ident)
+                    .then_some(1)
+                    .ok_or_else(|| Some(tok.to_string()))
+            }
         } else {
             Err(Some(tok.to_string()))
         }
     }
 }
 
-impl core::fmt::Display for Ident<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        self.0.fmt(f)
+impl core::fmt::Display for Ident {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.ident)
     }
 }
 
-impl DiagDisplay for Ident<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl DiagDisplay for Ident {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{self}")
     }
 }
 
 #[cfg(feature = "quote")]
-impl quote::ToTokens for Ident<'_> {
+impl quote::ToTokens for Ident {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         use quote::TokenStreamExt;
         stream.append(proc_macro2::Ident::new(
-            self.0,
-            proc_macro2::Span::call_site(),
+            &self.ident,
+            self.span,
         ));
+    }
+}
+
+impl core::cmp::PartialEq for Ident {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.ident == rhs.ident
+    }
+}
+
+impl core::cmp::PartialEq<str> for Ident {
+    fn eq(&self, rhs: &str) -> bool {
+        &*self.ident == rhs
+    }
+}
+
+impl core::cmp::PartialEq<&str> for Ident {
+    fn eq(&self, rhs: &&str) -> bool {
+        &*self.ident == *rhs
+    }
+}
+
+impl core::cmp::Eq for Ident {}
+
+impl core::hash::Hash for Ident {
+    fn hash<H>(&self, h: &mut H)
+    where
+        H: core::hash::Hasher,
+    {
+        self.ident.hash(h);
     }
 }

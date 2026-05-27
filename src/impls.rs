@@ -1,6 +1,18 @@
 use crate::procmacro::TokenTree;
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
+impl<T> MatchStream for &T
+where
+    T: MatchStream + ?Sized,
+{
+    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    where
+        S: StreamLike,
+    {
+        T::match_stream(*self, stream)
+    }
+}
+
 impl FromStream for TokenTree {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
@@ -48,6 +60,38 @@ impl MatchStream for TokenTree {
 }
 
 impl DiagDisplay for TokenTree {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
+// TODO: Should the string be tokenized, or the tokens stringified?
+// The former has the advantage of being more powerful and intuitive, but it's
+// also more costly and fallible.
+
+/// Matches a single token whose string representation matches this string.
+///
+/// Note that this doesn't match multiple tokens; e.g. `"->"` will never match
+/// anything, because that's two tokens (`-` and `>`).
+impl MatchStream for str {
+    /// Matches a single token whose string representation matches this string.
+    ///
+    /// Note that this doesn't match multiple tokens; e.g. `"->"` will never match
+    /// anything, because that's two tokens (`-` and `>`).
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    where
+        S: StreamLike,
+    {
+        let tt = stream.peek().ok_or(None)?.to_string();
+        if tt == self {
+            Ok(1)
+        } else {
+            Err(Some(tt))
+        }
+    }
+}
+
+impl DiagDisplay for str {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self}")
     }

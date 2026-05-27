@@ -1,4 +1,4 @@
-use crate::procmacro::{Delimiter, TokenStream, TokenTree};
+use crate::procmacro::{Delimiter, TokenStream, TokenTree, Span};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// The delimiters used by a [`Group`].
@@ -39,6 +39,8 @@ pub struct Group {
     pub kind: GroupKind,
     /// The inner tokens, not including the delimiters.
     pub inner: TokenStream,
+    /// The whole span of the original group.
+    pub span: Span,
 }
 
 #[cfg(feature = "quote")]
@@ -65,6 +67,7 @@ impl From<crate::procmacro::Group> for Group {
         Self {
             kind: g.delimiter().into(),
             inner: g.stream(),
+            span: g.span(),
         }
     }
 }
@@ -74,13 +77,16 @@ impl From<&crate::procmacro::Group> for Group {
         Self {
             kind: g.delimiter().into(),
             inner: g.stream(),
+            span: g.span(),
         }
     }
 }
 
 impl From<Group> for crate::procmacro::Group {
     fn from(g: Group) -> Self {
-        Self::new(g.kind.into(), g.inner)
+        let mut new = Self::new(g.kind.into(), g.inner);
+        new.set_span(g.span);
+        new
     }
 }
 
@@ -171,6 +177,7 @@ impl FromStream for Parens {
             Ok(Group {
                 kind: GroupKind::Paren,
                 inner: g.stream(),
+                span: g.span(),
             })
         } else {
             return Err(Error::new(
@@ -204,6 +211,7 @@ impl FromStream for Braces {
             Ok(Group {
                 kind: GroupKind::Brace,
                 inner: g.stream(),
+                span: g.span(),
             })
         } else {
             return Err(Error::new(
@@ -237,6 +245,7 @@ impl FromStream for Brackets {
             Ok(Group {
                 kind: GroupKind::Bracket,
                 inner: g.stream(),
+                span: g.span(),
             })
         } else {
             return Err(Error::new(

@@ -10,7 +10,7 @@ compose! {
         T: FromStream,
         T::Output: std::fmt::Debug + Clone + std::cmp::PartialEq,
     ] {
-        x: Ident<'static>,
+        x: Ident,
         = punct::Colon,
         ;^,
         y: [T; N],
@@ -20,8 +20,8 @@ compose! {
 compose! {
     #[derive(Debug, Clone, PartialEq)]
     pub enum Bar {
-        A(Foo<Literal<'static>, 3>),
-        B(Ident<'static>),
+        A(Foo<Literal, 3>),
+        B(Ident),
         C(punct::Semicolon),
     }
 }
@@ -31,9 +31,12 @@ fn compose_struct() {
     let s = "foo: 1 2 3";
     let input = s.parse::<TokenStream>().expect("invalid test input");
 
-    let foo = Foo::<Literal<'static>, 3>::from_stream(&mut Stream::from(input)).unwrap();
-    assert_eq!(foo.x.0, "foo");
-    assert_eq!(foo.y, [Literal("1"), Literal("2"), Literal("3"),]);
+    let foo = Foo::<Literal, 3>::from_stream(&mut Stream::from(input)).unwrap();
+    assert_eq!(foo.x.ident, "foo");
+    assert_eq!(foo.y.len(), 3);
+    for (x, y) in foo.y.iter().zip(["1", "2", "3"]) {
+        assert_eq!(x, y);
+    }
 }
 
 #[test]
@@ -49,14 +52,15 @@ fn compose_enum() {
         Bar::from_stream(&mut Stream::from(i5)),
     );
 
+    let lit = |s: &str| Literal { literal: s.into(), span: proc_macro2::Span::call_site() };
     assert_eq!(
         b1,
         Bar::A(Foo {
-            x: Ident("foo"),
-            y: [Literal("1"), Literal("2"), Literal("3")],
+            x: Ident { ident: "foo".into(), span: proc_macro2::Span::call_site() },
+            y: [lit("1"), lit("2"), lit("3")],
         })
     );
-    assert_eq!(b2, Bar::B(Ident("bar")));
+    assert_eq!(b2, Bar::B(Ident { ident: "bar".into(), span: proc_macro2::Span::call_site() }));
     assert_eq!(b3, Bar::C(punct::Semicolon));
 
     assert!(!b4.unwrap_err().fatal);

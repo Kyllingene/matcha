@@ -5,8 +5,8 @@ use proc_macro2::TokenStream;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Arg {
-    name: Ident<'static>,
-    type_: Ident<'static>,
+    name: Ident,
+    type_: Ident,
 }
 
 impl FromStream for Arg {
@@ -38,9 +38,9 @@ fn main() -> Result<(), Error> {
     decompose! {
         stream;
 
-        = Ident("extern");
+        = "extern";
         abi: Option<Literal>;
-        = Ident("fn");
+        = "fn";
         name: Ident;
 
         ( args: Delimited<Arg, punct::Comma> );
@@ -55,25 +55,17 @@ fn main() -> Result<(), Error> {
         = punct::Semicolon;
     }
 
-    assert_eq!(abi, Some(Literal("\"C\"")));
-    assert_eq!(name.0, "foo");
+    assert_eq!(abi.unwrap(), "\"C\"");
+    assert_eq!(name.ident, "foo");
 
-    assert_eq!(
-        args,
-        [
-            Arg {
-                name: Ident("x"),
-                type_: Ident("String"),
-            },
-            Arg {
-                name: Ident("y"),
-                type_: Ident("usize"),
-            },
-        ]
-    );
+    assert_eq!(args.len(), 2);
+    assert_eq!(args[0].name, "x");
+    assert_eq!(args[0].type_, "String");
+    assert_eq!(args[1].name, "y");
+    assert_eq!(args[1].type_, "usize");
 
-    assert_eq!(wrapper.0, "Option");
-    assert_eq!(inner.0, "char");
+    assert_eq!(wrapper.ident, "Option");
+    assert_eq!(inner.ident, "char");
 
     Ok(())
 }

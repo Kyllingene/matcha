@@ -1,11 +1,15 @@
 use crate::procmacro::{Span, TokenTree};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
-/// A piece of punctuation (e.g. `123`, `bool`, `"foo"`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Literal<'a>(pub &'a str);
+/// A literal.
+#[allow(missing_docs)]
+#[derive(Debug, Clone)]
+pub struct Literal {
+    pub literal: String,
+    pub span: Span,
+}
 
-impl FromStream for Literal<'static> {
+impl FromStream for Literal {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
@@ -17,10 +21,11 @@ impl FromStream for Literal<'static> {
                 return Err(stream.err_eos(ErrorText::Plain("literal".into())));
             }
         };
-        if let TokenTree::Literal(l) = tok {
-            let s = l.to_string().leak();
+        if let TokenTree::Literal(i) = tok {
+            let literal = i.to_string();
+            let span = i.span();
             stream.pop();
-            Ok(Self(s))
+            Ok(Self { literal, span })
         } else {
             Err(Error::new(
                 ErrorText::Plain("literal".into()),
@@ -31,14 +36,14 @@ impl FromStream for Literal<'static> {
     }
 }
 
-impl MatchStream for Literal<'_> {
+impl MatchStream for Literal {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
     where
         S: StreamLike,
     {
         let tok = stream.peek().ok_or(None)?;
-        if let TokenTree::Literal(l) = tok {
-            (&*l.to_string() == self.0)
+        if let TokenTree::Literal(i) = tok {
+            (i.to_string() == self.literal)
                 .then_some(1)
                 .ok_or_else(|| Some(tok.to_string()))
         } else {
@@ -47,23 +52,56 @@ impl MatchStream for Literal<'_> {
     }
 }
 
-impl core::fmt::Display for Literal<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        self.0.fmt(f)
+impl core::fmt::Display for Literal {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.literal)
     }
 }
 
-impl DiagDisplay for Literal<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl DiagDisplay for Literal {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{self}")
     }
 }
 
 #[cfg(feature = "quote")]
-impl quote::ToTokens for Literal<'_> {
+impl quote::ToTokens for Literal {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
-        use core::str::FromStr;
         use quote::TokenStreamExt;
-        stream.append(proc_macro2::Literal::from_str(self.0).expect("invalid literal"));
+        use core::str::FromStr;
+        let mut tt = proc_macro2::Literal::from_str(
+            &self.literal,
+        ).expect("invalid literal");
+        tt.set_span(self.span);
+        stream.append(tt);
+    }
+}
+
+impl core::cmp::PartialEq for Literal {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.literal == rhs.literal
+    }
+}
+
+impl core::cmp::PartialEq<str> for Literal {
+    fn eq(&self, rhs: &str) -> bool {
+        &*self.literal == rhs
+    }
+}
+
+impl core::cmp::PartialEq<&str> for Literal {
+    fn eq(&self, rhs: &&str) -> bool {
+        &*self.literal == *rhs
+    }
+}
+
+impl core::cmp::Eq for Literal {}
+
+impl core::hash::Hash for Literal {
+    fn hash<H>(&self, h: &mut H)
+    where
+        H: core::hash::Hasher,
+    {
+        self.literal.hash(h);
     }
 }

@@ -1,11 +1,15 @@
-use crate::procmacro::TokenTree;
+use crate::procmacro::{TokenTree, Span};
 use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// A piece of punctuation (e.g. `!`, `.`, `:`).
 ///
 /// See also [`punct`] for helpers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Punct(pub char);
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Copy)]
+pub struct Punct {
+    pub ch: char,
+    pub span: Span,
+}
 
 impl FromStream for Punct {
     type Output = Self;
@@ -20,9 +24,10 @@ impl FromStream for Punct {
             }
         };
         if let TokenTree::Punct(p) = tok {
-            let c = p.as_char();
+            let ch = p.as_char();
+            let span = p.span();
             stream.pop();
-            Ok(Self(c))
+            Ok(Self { ch, span })
         } else {
             Err(Error::new(
                 ErrorText::Plain("punctuation".into()),
@@ -40,7 +45,7 @@ impl MatchStream for Punct {
     {
         let tok = stream.peek().ok_or(None)?;
         if let TokenTree::Punct(p) = tok {
-            (p.as_char() == self.0)
+            (p.as_char() == self.ch)
                 .then_some(1)
                 .ok_or_else(|| Some(tok.to_string()))
         } else {
@@ -51,7 +56,7 @@ impl MatchStream for Punct {
 
 impl core::fmt::Display for Punct {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        self.0.fmt(f)
+        self.ch.fmt(f)
     }
 }
 
@@ -65,7 +70,34 @@ impl DiagDisplay for Punct {
 impl quote::ToTokens for Punct {
     fn to_tokens(&self, stream: &mut proc_macro2::TokenStream) {
         use quote::TokenStreamExt;
-        stream.append(proc_macro2::Punct::new(self.0, proc_macro2::Spacing::Alone));
+        stream.append(proc_macro2::Punct::new(self.ch, proc_macro2::Spacing::Alone));
+    }
+}
+
+impl core::cmp::PartialEq for Punct {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.ch == rhs.ch
+    }
+}
+
+impl core::cmp::PartialEq<char> for Punct {
+    fn eq(&self, rhs: &char) -> bool {
+        self.ch == *rhs
+    }
+}
+
+impl core::cmp::PartialEq<&char> for Punct {
+    fn eq(&self, rhs: &&char) -> bool {
+        self.ch == **rhs
+    }
+}
+
+impl core::hash::Hash for Punct {
+    fn hash<H>(&self, h: &mut H)
+    where
+        H: core::hash::Hasher,
+    {
+        self.ch.hash(h);
     }
 }
 
@@ -89,7 +121,9 @@ pub mod punct {
             impl FromStream for $name {
                 type Output = Self;
                 fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
-where S: StreamLike, {
+                where
+                    S: StreamLike,
+                {
                     let tok = match stream.peek() {
                         Some(tt) => tt,
                         None => {

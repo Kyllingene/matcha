@@ -53,12 +53,13 @@
 ///     stream;
 ///
 ///     // matches an expression; can be anything that implements `MatchStream`
-///     = Ident("extern");
+///     // note that `&str` can only match one token
+///     = "extern";
 ///     
 ///     // tries to parse a type; can be anything that implements `FromStream`
 ///     abi: Literal;
 ///
-///     = Ident("fn");
+///     = "fn";
 ///     name: Ident;
 ///
 ///     // parses a group delimited by parenthesis
@@ -89,15 +90,15 @@
 ///     // stream, it would return an error
 /// }
 ///
-/// assert_eq!(abi.0, "\"C\"");
-/// assert_eq!(name.0, "foo");
+/// assert_eq!(abi.literal, "\"C\"");
+/// assert_eq!(name.ident, "foo");
 ///
-/// assert_eq!(arg1_name.0, "x");
+/// assert_eq!(arg1_name.ident, "x");
 /// assert_eq!(arg1_type.kind, GroupKind::Bracket);
 /// assert_eq!(arg1_type.inner.to_string(), "u8 ; 5");
 ///
-/// assert_eq!(arg2_name.0, "y");
-/// assert_eq!(arg2_type.0, "u32");
+/// assert_eq!(arg2_name.ident, "y");
+/// assert_eq!(arg2_type.ident, "u32");
 /// # Ok(()) }
 /// ```
 #[macro_export]
