@@ -95,7 +95,6 @@ pub trait StreamLike {
             expected,
             got: ErrorText::EndOfStream,
             fatal: false,
-            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
             at: self.last_span().unwrap_or_else(Span::call_site),
         }
     }

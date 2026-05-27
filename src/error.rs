@@ -1,4 +1,4 @@
-use crate::procmacro::Span;
+use crate::procmacro::{TokenStream, Span};
 
 /// The text for an [`Error`].
 #[derive(Debug, Clone)]
@@ -43,30 +43,23 @@ pub struct Error {
     ///
     /// If that location isn't available, you should default to
     /// [`Span::call_site`].
-    ///
-    /// Is not available if feature `proc-macro2` is enabled but not
-    /// `proc-macro2-span-locations`.
-    #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
     pub at: Span,
 }
 
 impl Error {
     /// Create a new error.
-    ///
-    /// If feature `proc-macro2` is enabled but not
-    /// `proc-macro2-span-locations`, ignores `at`.
-    #[cfg_attr(
-        all(not(feature = "proc-macro2-span-locations"), feature = "proc-macro2"),
-        expect(unused_variables, reason = "`at` isn't used without span locations")
-    )]
     pub const fn new(expected: ErrorText, got: ErrorText, at: Span) -> Self {
         Self {
             expected,
             got,
             fatal: false,
-            #[cfg(any(feature = "proc-macro2-span-locations", not(feature = "proc-macro2")))]
             at,
         }
+    }
+
+    /// Generates a compile error with the enclosed information.
+    pub fn throw(&self) -> TokenStream {
+        crate::error(format!("{self}"), self.at)
     }
 
     /// Flags this error as fatal.
@@ -97,11 +90,11 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "expected {}, got {}", self.expected, self.got)?;
 
-        #[cfg(feature = "proc-macro2-span-locations")]
-        {
-            let lc = self.at.start();
-            write!(f, " (at {}:{}:{})", self.at.file(), lc.line, lc.column,)?;
-        }
+        // #[cfg(feature = "proc-macro2-span-locations")]
+        // {
+        //     let lc = self.at.start();
+        //     write!(f, " (at {}:{}:{})", self.at.file(), lc.line, lc.column,)?;
+        // }
 
         Ok(())
     }
@@ -112,12 +105,13 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "expected {}, got {} (at {}:{}:{})",
+            // "expected {}, got {} (at {}:{}:{})",
+            "expected {}, got {}",
             self.expected,
             self.got,
-            self.at.file(),
-            self.at.line(),
-            self.at.column(),
+            // self.at.file(),
+            // self.at.line(),
+            // self.at.column(),
         )
     }
 }
