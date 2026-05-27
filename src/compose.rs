@@ -5,11 +5,11 @@
 /// `name: Other as Type`, where `Other` is the field type and `Type` is the
 /// type implementing `FromStream`.
 ///
-/// You can map fields using the syntax `name: Type as OtherType => { ... }`.
-/// In this example, `Type` is the final type of the field (that needn't
-/// implement `FromStream`), `OtherType` is a type implementing `FromStream`,
-/// and inside the block is code converting `OtherType` (bound to `name`) into
-/// `Type`.
+/// You can map fields using the syntax `name: Type as OtherType => { ... }`. In
+/// this example, `Type` is the final type of the field (that needn't implement
+/// `FromStream`), `OtherType` is a type implementing `FromStream`, and inside
+/// the block is code converting `<OtherType as FromStream>::Output` (bound to
+/// `name`) into `Type`.
 ///
 /// Among the fields, you can also use `= expr` to match a literal expression
 /// implementing [`MatchStream`](crate::MatchStream). You can also use what I
