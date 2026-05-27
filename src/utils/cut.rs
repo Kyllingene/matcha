@@ -1,4 +1,4 @@
-use crate::{FromStream, StreamLike, Error};
+use crate::{Error, FromStream, StreamLike};
 
 /// A helper for committing to a parse tree.
 ///

@@ -1,4 +1,4 @@
-use crate::{FromStream, StreamLike, Error, ErrorText};
+use crate::{Error, ErrorText, FromStream, StreamLike};
 
 /// A helper for ensuring a given item is the last in the stream.
 ///

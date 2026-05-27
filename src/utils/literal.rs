@@ -1,5 +1,5 @@
-use crate::procmacro::{TokenTree, Span};
-use crate::{FromStream, StreamLike, StreamView, DiagDisplay, MatchStream, Error, ErrorText};
+use crate::procmacro::{Span, TokenTree};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// A piece of punctuation (e.g. `123`, `bool`, `"foo"`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

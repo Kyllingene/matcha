@@ -1,4 +1,4 @@
-use crate::{MatchStream, DiagDisplay, StreamView, StreamLike};
+use crate::{DiagDisplay, MatchStream, StreamLike, StreamView};
 
 /// A helper for matching the inverse of a pattern.
 ///
@@ -23,4 +23,3 @@ impl<T: DiagDisplay> DiagDisplay for Neg<T> {
         self.0.fmt(f)
     }
 }
-

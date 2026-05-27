@@ -1,5 +1,5 @@
-use crate::{FromStream, MatchStream, Error, ErrorText, StreamLike, StreamView, DiagDisplay};
 use crate::procmacro::{Delimiter, TokenStream, TokenTree};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// The delimiters used by a [`Group`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

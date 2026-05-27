@@ -1,5 +1,5 @@
-use crate::{FromStream, MatchStream, StreamView, StreamLike, Error, ErrorText, DiagDisplay};
 use crate::procmacro::TokenTree;
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
 
 /// A piece of punctuation (e.g. `!`, `.`, `:`).
 ///

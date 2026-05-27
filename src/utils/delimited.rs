@@ -1,4 +1,4 @@
-use crate::{FromStream, Error, StreamLike};
+use crate::{Error, FromStream, StreamLike};
 
 /// A helper for parsing a series of items.
 ///

@@ -1,4 +1,4 @@
-use crate::{MatchStream, StreamView, StreamLike, DiagDisplay};
+use crate::{DiagDisplay, MatchStream, StreamLike, StreamView};
 
 /// A helper for optionally matching a given pattern.
 ///
