@@ -27,13 +27,13 @@ pub use proc_macro as procmacro;
 
 mod compose;
 mod decompose;
+mod error;
 mod impls;
 mod stream;
 mod utils;
 
-pub use stream::{
-    DiagDisplay, Error, ErrorText, FromStream, MatchStream, Stream, StreamLike, StreamView,
-};
+pub use error::{Error, ErrorText};
+pub use stream::{DiagDisplay, FromStream, MatchStream, Stream, StreamLike, StreamView};
 pub use utils::{
     Braces, Brackets, Cut, Delimited, Greedy, Group, GroupKind, Ident, Literal, Maybe, Neg, Parens,
     Punct, punct,
