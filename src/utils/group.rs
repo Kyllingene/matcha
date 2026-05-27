@@ -41,21 +41,21 @@ pub struct Group {
     pub inner: TokenStream,
     /// The whole span of the original group.
     ///
-    /// ```
+    /// ```txt
     /// ( ... )
     /// ^^^^^^^
     /// ```
     pub span: Span,
     /// The span of the opening delimiter.
     ///
-    /// ```
+    /// ```txt
     /// ( ... )
     /// ^
     /// ```
     pub span_open: Span,
     /// The span of the closing delimiter.
     ///
-    /// ```
+    /// ```txt
     /// ( ... )
     ///       ^
     /// ```
