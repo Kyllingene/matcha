@@ -24,11 +24,18 @@ fn main() {
     assert_eq!(lits, ["1", "2", "3"]);
     let lits = RepeatPlus::<Literal>::from_stream(&mut g2_stream.view()).unwrap();
     assert_eq!(lits, ["1", "2", "3"]);
+    let lits = RepeatRange::<Literal, 2, 4>::from_stream(&mut g2_stream.view()).unwrap();
+    assert_eq!(lits, ["1", "2", "3"]);
+    let lits = RepeatRange::<Literal, 0, 2>::from_stream(&mut g2_stream.view()).unwrap();
+    assert_eq!(lits, ["1", "2"]);
 
     let mut g3_stream = Stream::from(g3.inner);
     let lits = RepeatAny::<Literal>::from_stream(&mut g3_stream.view()).unwrap();
     assert_eq!(lits, [""; 0]);
     assert!(RepeatPlus::<Literal>::from_stream(&mut g3_stream.view()).is_err());
+    let lits = RepeatRange::<Literal, 0, 4>::from_stream(&mut g3_stream.view()).unwrap();
+    assert_eq!(lits, [""; 0]);
+    assert!(RepeatRange::<Literal, 2, 4>::from_stream(&mut g3_stream.view()).is_err());
 
     let idents = Cut::<Delimited<Ident, punct::Semicolon>>::from_stream(&mut stream).unwrap();
     assert_eq!(idents, ["a", "b", "c"]);
