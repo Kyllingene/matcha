@@ -12,6 +12,26 @@ pub enum GroupKind {
     Bracket,
 }
 
+impl GroupKind {
+    /// The opening delimiter for this kind of group.
+    pub const fn open(self) -> char {
+        match self {
+            Self::Paren => '(',
+            Self::Brace => '{',
+            Self::Bracket => '[',
+        }
+    }
+
+    /// The closing delimiter for this kind of group.
+    pub const fn close(self) -> char {
+        match self {
+            Self::Paren => ')',
+            Self::Brace => '}',
+            Self::Bracket => ']',
+        }
+    }
+}
+
 impl From<Delimiter> for GroupKind {
     fn from(d: Delimiter) -> Self {
         match d {
@@ -181,52 +201,52 @@ pub struct Braces;
 /// A helper for parsing a [`Group`] with [`GroupKind::Bracket`].
 pub struct Brackets;
 
+fn parse_group(kind: GroupKind, stream: &mut impl StreamLike) -> Result<Group, Error> {
+    let tok = match stream.peek() {
+        Some(tt) => tt,
+        None => {
+            return Err(stream.err_eos(ErrorText::Backticks("(".into())));
+        }
+    };
+    let span = tok.span();
+    let result = if let TokenTree::Group(g) = tok
+        && g.delimiter() != Delimiter::None
+    {
+        let g_kind = GroupKind::from(g.delimiter());
+        if g_kind == kind {
+            Ok(Group {
+                kind,
+                inner: g.stream(),
+                span: g.span(),
+                span_open: g.span_open(),
+                span_close: g.span_close(),
+            })
+        } else {
+            Err(Error::new(
+                ErrorText::Backticks(kind.open().into()),
+                ErrorText::Backticks(g_kind.open().into()),
+                g.span_open(),
+            ))
+        }
+    } else {
+        return Err(Error::new(
+            ErrorText::Backticks(kind.open().into()),
+            ErrorText::Backticks(tok.to_string()),
+            span,
+        ));
+    };
+
+    stream.pop();
+    result
+}
+
 impl FromStream for Parens {
     type Output = Group;
     fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
     where
         S: StreamLike,
     {
-        let tok = match stream.peek() {
-            Some(tt) => tt,
-            None => {
-                return Err(stream.err_eos(ErrorText::Backticks("(".into())));
-            }
-        };
-        let span = tok.span();
-        let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() != Delimiter::None
-        {
-            match g.delimiter() {
-                Delimiter::Parenthesis => Ok(Group {
-                    kind: GroupKind::Paren,
-                    inner: g.stream(),
-                    span: g.span(),
-                    span_open: g.span_open(),
-                    span_close: g.span_close(),
-                }),
-                Delimiter::Brace => Err(Error::new(
-                    ErrorText::Backticks("(".into()),
-                    ErrorText::Backticks("{".into()),
-                    g.span_open(),
-                )),
-                Delimiter::Bracket => Err(Error::new(
-                    ErrorText::Backticks("(".into()),
-                    ErrorText::Backticks("[".into()),
-                    g.span_open(),
-                )),
-                Delimiter::None => unreachable!(),
-            }
-        } else {
-            return Err(Error::new(
-                ErrorText::Backticks("(".into()),
-                ErrorText::Backticks(tok.to_string()),
-                span,
-            ));
-        };
-
-        stream.pop();
-        result
+        parse_group(GroupKind::Paren, stream)
     }
 }
 
@@ -236,46 +256,7 @@ impl FromStream for Braces {
     where
         S: StreamLike,
     {
-        let tok = match stream.peek() {
-            Some(tt) => tt,
-            None => {
-                return Err(stream.err_eos(ErrorText::Backticks("{".into())));
-            }
-        };
-        let span = tok.span();
-        let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() != Delimiter::None
-        {
-            match g.delimiter() {
-                Delimiter::Brace => Ok(Group {
-                    kind: GroupKind::Bracket,
-                    inner: g.stream(),
-                    span: g.span(),
-                    span_open: g.span_open(),
-                    span_close: g.span_close(),
-                }),
-                Delimiter::Parenthesis => Err(Error::new(
-                    ErrorText::Backticks("{".into()),
-                    ErrorText::Backticks("(".into()),
-                    g.span_open(),
-                )),
-                Delimiter::Bracket => Err(Error::new(
-                    ErrorText::Backticks("{".into()),
-                    ErrorText::Backticks("[".into()),
-                    g.span_open(),
-                )),
-                Delimiter::None => unreachable!(),
-            }
-        } else {
-            return Err(Error::new(
-                ErrorText::Backticks("{".into()),
-                ErrorText::Backticks(tok.to_string()),
-                span,
-            ));
-        };
-
-        stream.pop();
-        result
+        parse_group(GroupKind::Brace, stream)
     }
 }
 
@@ -285,45 +266,6 @@ impl FromStream for Brackets {
     where
         S: StreamLike,
     {
-        let tok = match stream.peek() {
-            Some(tt) => tt,
-            None => {
-                return Err(stream.err_eos(ErrorText::Backticks("[".into())));
-            }
-        };
-        let span = tok.span();
-        let result = if let TokenTree::Group(g) = tok
-            && g.delimiter() != Delimiter::None
-        {
-            match g.delimiter() {
-                Delimiter::Bracket => Ok(Group {
-                    kind: GroupKind::Bracket,
-                    inner: g.stream(),
-                    span: g.span(),
-                    span_open: g.span_open(),
-                    span_close: g.span_close(),
-                }),
-                Delimiter::Parenthesis => Err(Error::new(
-                    ErrorText::Backticks("[".into()),
-                    ErrorText::Backticks("(".into()),
-                    g.span_open(),
-                )),
-                Delimiter::Brace => Err(Error::new(
-                    ErrorText::Backticks("[".into()),
-                    ErrorText::Backticks("{".into()),
-                    g.span_open(),
-                )),
-                Delimiter::None => unreachable!(),
-            }
-        } else {
-            return Err(Error::new(
-                ErrorText::Backticks("[".into()),
-                ErrorText::Backticks(tok.to_string()),
-                span,
-            ));
-        };
-
-        stream.pop();
-        result
+        parse_group(GroupKind::Bracket, stream)
     }
 }

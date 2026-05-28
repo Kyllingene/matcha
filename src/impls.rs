@@ -241,7 +241,9 @@ macro_rules! impl_tuple {
             type Output = ($($t::Output,)+);
 
             fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
-where S: StreamLike, {
+            where
+                S: StreamLike,
+            {
                 Ok(($(
                     $t::from_stream(stream)?,
                 )+))

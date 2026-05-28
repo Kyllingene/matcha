@@ -84,34 +84,8 @@ impl Error {
         self
     }
 }
-
-#[cfg(feature = "proc-macro2")]
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "expected {}, got {}", self.expected, self.got)?;
-
-        // #[cfg(feature = "proc-macro2-span-locations")]
-        // {
-        //     let lc = self.at.start();
-        //     write!(f, " (at {}:{}:{})", self.at.file(), lc.line, lc.column,)?;
-        // }
-
-        Ok(())
-    }
-}
-
-#[cfg(not(feature = "proc-macro2"))]
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            // "expected {}, got {} (at {}:{}:{})",
-            "expected {}, got {}",
-            self.expected,
-            self.got,
-            // self.at.file(),
-            // self.at.line(),
-            // self.at.column(),
-        )
+        write!(f, "expected {}, got {}", self.expected, self.got,)
     }
 }
