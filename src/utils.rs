@@ -7,6 +7,7 @@ mod literal;
 mod maybe;
 mod neg;
 mod puncts;
+mod rep;
 
 pub use cut::*;
 pub use delimited::*;
@@ -17,3 +18,4 @@ pub use literal::*;
 pub use maybe::*;
 pub use neg::*;
 pub use puncts::*;
+pub use rep::*;

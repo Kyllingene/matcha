@@ -48,10 +48,7 @@ fn compose_struct() {
 
     let foo = Foo::<Literal, 3>::from_stream(&mut Stream::from(input)).unwrap();
     assert_eq!(foo.x.ident, "foo");
-    assert_eq!(foo.y.len(), 3);
-    for (x, y) in foo.y.iter().zip(["1", "2", "3"]) {
-        assert_eq!(x, y);
-    }
+    assert_eq!(foo.y, ["1", "2", "3"]);
     assert_eq!(foo.z.unwrap(), "bar");
 }
 
