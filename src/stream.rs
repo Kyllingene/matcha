@@ -422,7 +422,7 @@ impl<S: StreamLike> StreamLike for StreamView<'_, S> {
     }
 
     fn peek_from(&mut self, at: usize) -> &[TokenTree] {
-        self.stream.peek_from(at)
+        self.stream.peek_from(at + self.skip)
     }
 
     fn stringify(&mut self) -> String {
