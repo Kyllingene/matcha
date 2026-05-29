@@ -37,7 +37,7 @@ compose! {
     pub enum Bar {
         A(Foo<Literal, 3>),
         B(Ident),
-        C(punct::Semicolon),
+        C = punct::Semicolon,
     }
 }
 
@@ -87,7 +87,7 @@ fn compose_enum() {
             span: proc_macro2::Span::call_site()
         })
     );
-    assert_eq!(b3, Bar::C(punct::Semicolon));
+    assert_eq!(b3, Bar::C);
 
     assert!(!b4.unwrap_err().fatal);
     assert!(b5.unwrap_err().fatal);

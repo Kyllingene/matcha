@@ -2,6 +2,17 @@ use crate::procmacro::{Span, TokenStream, TokenTree};
 use crate::{Error, ErrorText};
 use std::collections::VecDeque;
 
+/// The return type of [`MatchStream::match_stream`].
+///
+/// `Ok(n)` indicates that the pattern succesfully matched, and `n` tokens were
+/// "consumed".
+///
+/// `Err((got, span))` indicates that the type failed to match the stream. If
+/// `got` is `Some`, it contains the unexpected data that was encountered. If it
+/// is `None`, then the end of the stream was encountered. In either case,
+/// `span` points at the the unexpected data (or end of the stream)
+pub type MatchResult = Result<usize, (Option<String>, Span)>;
+
 /// Parse a type out of a [`Stream`].
 pub trait FromStream {
     /// The type to be produced.
@@ -27,10 +38,11 @@ pub trait MatchStream: DiagDisplay {
     /// If it matches, returns `Ok(n)`, where `n` is how many tokens the pattern
     /// matched against.
     ///
-    /// If it fails, returns `Err(got)`. If `got` is `Some`, then it is the
-    /// data that was found instead of itself; else, the end of the stream was
-    /// found before the end of the pattern.
-    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    /// If it fails, returns `Err((got, span))`. If `got` is `Some`, then it is
+    /// the data that was found instead of itself; else, the end of the stream
+    /// was found before the end of the pattern. In either case, `span` points
+    /// at the unexpected data (or end of the stream).
+    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike;
 }
@@ -89,6 +101,16 @@ pub trait StreamLike {
     /// Skips the next `n` tokens.
     fn skip(&mut self, n: usize);
 
+    /// Returns the next token in the stream, if any.
+    /// 
+    /// If no token is available, returns
+    /// <code>Err((None, [self.span_close()](StreamLike::span_close)))</code>,
+    /// for use in [`MatchStream`] impls.
+    fn peek_or(&mut self) -> Result<&TokenTree, (Option<String>, Span)> {
+        let span = self.span_close();
+        self.peek().ok_or((None, span))
+    }
+
     /// Stringifies the remaining tokens in the stream.
     ///
     /// Note that it's impossible to get the span or source for a `TokenStream`,
@@ -98,7 +120,9 @@ pub trait StreamLike {
 
     /// The span of the closing delimiter for this group.
     ///
-    /// If there is no closing delimiter, points to the last token in the stream.
+    /// If there is no closing delimiter, points to the last token in the
+    /// stream. If there is none (the stream is empty), returns the span of the
+    /// stream as a whole.
     ///
     /// ```txt
     /// `( ... )`
@@ -107,18 +131,17 @@ pub trait StreamLike {
     /// `let x = y;`
     ///           ^
     /// ```
-    fn span_close(&self) -> Option<Span>;
+    fn span_close(&mut self) -> Span;
 
     /// Creates a new [`Error`] with <code>got: [ErrorText::EndOfStream]</code>.
     ///
-    /// `at` is set the <code>self.[span_close](Self::span_close)()</code>.
-    /// If `self.span_close()` is `None`, defaults to [`Span::call_site`].
-    fn err_eos(&self, expected: ErrorText) -> Error {
+    /// `at` is set to <code>self.[span_close](Self::span_close)()</code>.
+    fn err_eos(&mut self, expected: ErrorText) -> Error {
         Error {
             expected,
             got: ErrorText::EndOfStream,
             fatal: false,
-            at: self.span_close().unwrap_or_else(Span::call_site),
+            at: self.span_close(),
         }
     }
 
@@ -132,11 +155,9 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
-        let span_close = self.span_close();
         StreamView {
             stream: self,
             skip: 0,
-            span_close,
         }
     }
 
@@ -146,11 +167,9 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
-        let span_close = self.span_close();
         StreamView {
             stream: self,
             skip,
-            span_close,
         }
     }
 }
@@ -183,10 +202,10 @@ impl<S: StreamLike + ?Sized> StreamLike for &mut S {
     fn stringify(&mut self) -> String {
         (**self).stringify()
     }
-    fn span_close(&self) -> Option<Span> {
+    fn span_close(&mut self) -> Span {
         (**self).span_close()
     }
-    fn err_eos(&self, expected: ErrorText) -> Error {
+    fn err_eos(&mut self, expected: ErrorText) -> Error {
         (**self).err_eos(expected)
     }
     fn is_empty(&mut self) -> bool {
@@ -196,22 +215,18 @@ impl<S: StreamLike + ?Sized> StreamLike for &mut S {
     where
         Self: Sized,
     {
-        let span_close = self.span_close();
         StreamView {
             stream: self,
             skip: 0,
-            span_close,
         }
     }
     fn view_from(&mut self, skip: usize) -> StreamView<'_, Self>
     where
         Self: Sized,
     {
-        let span_close = self.span_close();
         StreamView {
             stream: self,
             skip,
-            span_close,
         }
     }
 }
@@ -362,8 +377,20 @@ impl StreamLike for Stream {
         s
     }
 
-    fn span_close(&self) -> Option<Span> {
-        self.span_close
+    fn span_close(&mut self) -> Span {
+        if self.span_close.is_none() {
+            self.span_close = self.peek_last().map(|tt| tt.span());
+        }
+
+        self.span_close.unwrap_or_else(|| {
+            eprintln!(
+                "[matcha] WARNING: encountered stream with no span. This is\
+                typically a result of doing `Stream::from(group.inner)` instead
+                of `Stream::from(group)`. This can result in degraded\
+                diagnostics."
+            );
+            Span::call_site()
+        })
     }
 }
 
@@ -372,7 +399,6 @@ impl StreamLike for Stream {
 pub struct StreamView<'a, S> {
     stream: &'a mut S,
     skip: usize,
-    span_close: Option<Span>,
 }
 
 impl<S: StreamLike> StreamView<'_, S> {
@@ -390,9 +416,6 @@ impl<S: StreamLike> StreamView<'_, S> {
 impl<S: StreamLike> StreamLike for StreamView<'_, S> {
     fn pop(&mut self) -> Option<TokenTree> {
         let tt = self.peek()?.clone();
-        if self.span_close.is_none() {
-            self.span_close = Some(tt.span());
-        }
         self.skip(1);
         Some(tt)
     }
@@ -436,7 +459,7 @@ impl<S: StreamLike> StreamLike for StreamView<'_, S> {
         s
     }
 
-    fn span_close(&self) -> Option<Span> {
-        self.span_close
+    fn span_close(&mut self) -> Span {
+        self.stream.span_close()
     }
 }

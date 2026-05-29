@@ -146,7 +146,9 @@ macro_rules! __compose_inner {
         $(where [$($where:tt)*])?
         { $(
             $(#[$variant_attrs:meta])*
-            $variant_name:ident($variant_inner:ty)
+            $variant_name:ident
+                $(($variant_inner:ty))?
+                $( = $variant_match:expr )?
         ),+ $(,)? }
     ) => {
         $(#[$attrs])*
@@ -159,7 +161,7 @@ macro_rules! __compose_inner {
             $(where $($where)*)?
         { $(
             $(#[$variant_attrs])*
-            $variant_name(<$variant_inner as $crate::FromStream>::Output),
+            $variant_name $((<$variant_inner as $crate::FromStream>::Output))?,
         )+ }
 
         impl
@@ -184,20 +186,28 @@ macro_rules! __compose_inner {
             {
                 // TODO: is there a better way to aggregate errors?
                 let mut err;
-                let mut view = stream.view();
             $(
-                match <$variant_inner as $crate::FromStream>::from_stream(&mut view) {
-                    Ok(x) => {
-                        let skipped = view.skipped();
-                        stream.skip(skipped);
-                        return Ok(Self::$variant_name(x));
+                $(
+                    let mut view = stream.view();
+                    match <$variant_inner as $crate::FromStream>::from_stream(&mut view) {
+                        Ok(x) => {
+                            let skipped = view.skipped();
+                            stream.skip(skipped);
+                            return Ok(Self::$variant_name(x));
+                        }
+                        Err(e) if e.fatal => return Err(e),
+                        Err(e) => {
+                            err = e;
+                            view.reset_skip();
+                        }
                     }
-                    Err(e) if e.fatal => return Err(e),
-                    Err(e) => {
-                        err = e;
-                        view.reset_skip();
+                )?
+                $(
+                    if let Ok(n) = $crate::MatchStream::match_stream(&$variant_match, stream.view()) {
+                        stream.skip(n);
+                        return Ok(Self::$variant_name);
                     }
-                }
+                )?
             )+
                 Err(err)
             }

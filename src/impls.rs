@@ -1,11 +1,11 @@
 use crate::procmacro::TokenTree;
-use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView, MatchResult};
 
 impl<T> MatchStream for &T
 where
     T: MatchStream + ?Sized,
 {
-    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
@@ -24,37 +24,37 @@ impl FromStream for TokenTree {
 }
 
 impl MatchStream for TokenTree {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
-        match (self, stream.peek().ok_or(None)?) {
+        match (self, stream.peek_or()?) {
             (TokenTree::Group(lhs), TokenTree::Group(rhs)) => (lhs.to_string() == rhs.to_string())
                 .then_some(1)
-                .ok_or_else(|| Some(rhs.to_string())),
+                .ok_or_else(|| (Some(rhs.to_string()), rhs.span())),
             (TokenTree::Ident(lhs), TokenTree::Ident(rhs)) => {
                 #[cfg(feature = "proc-macro2")]
                 {
                     (lhs == rhs)
                         .then_some(1)
-                        .ok_or_else(|| Some(rhs.to_string()))
+                        .ok_or_else(|| (Some(rhs.to_string()), rhs.span()))
                 }
 
                 #[cfg(not(feature = "proc-macro2"))]
                 {
                     (lhs.to_string() == rhs.to_string())
                         .then_some(1)
-                        .ok_or_else(|| Some(rhs.to_string()))
+                        .ok_or_else(|| (Some(rhs.to_string()), rhs.span()))
                 }
             }
             (TokenTree::Punct(lhs), TokenTree::Punct(rhs)) => (lhs.to_string() == rhs.to_string())
                 .then_some(1)
-                .ok_or_else(|| Some(rhs.to_string())),
+                .ok_or_else(|| (Some(rhs.to_string()), rhs.span())),
             (TokenTree::Literal(lhs), TokenTree::Literal(rhs)) => (lhs.to_string()
                 == rhs.to_string())
             .then_some(1)
-            .ok_or_else(|| Some(rhs.to_string())),
-            (_, rhs) => Err(Some(rhs.to_string())),
+            .ok_or_else(|| (Some(rhs.to_string()), rhs.span())),
+            (_, rhs) => Err((Some(rhs.to_string()), rhs.span())),
         }
     }
 }
@@ -78,12 +78,13 @@ impl MatchStream for str {
     ///
     /// Note that this doesn't match multiple tokens; e.g. `"->"` will never match
     /// anything, because that's two tokens (`-` and `>`).
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
-        let tt = stream.peek().ok_or(None)?.to_string();
-        if tt == self { Ok(1) } else { Err(Some(tt)) }
+        let tt = stream.peek_or()?;
+        let s = tt.to_string();
+        if s == self { Ok(1) } else { Err((Some(s), tt.span())) }
     }
 }
 
@@ -159,7 +160,7 @@ impl<T> MatchStream for [T]
 where
     T: MatchStream,
 {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
@@ -188,7 +189,7 @@ impl<T, const N: usize> MatchStream for [T; N]
 where
     T: MatchStream,
 {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
@@ -217,7 +218,7 @@ impl<T> MatchStream for Vec<T>
 where
     T: MatchStream,
 {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
@@ -267,7 +268,7 @@ macro_rules! impl_tuple {
             $($t: MatchStream),+
         {
             #[allow(non_snake_case)]
-            fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+            fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
             where
                 S: StreamLike,
             {

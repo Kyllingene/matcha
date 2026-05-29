@@ -1,4 +1,5 @@
-use crate::{DiagDisplay, MatchStream, StreamLike, StreamView};
+use crate::procmacro::{Span, TokenTree};
+use crate::{DiagDisplay, MatchStream, StreamLike, StreamView, MatchResult};
 
 /// A helper for matching the inverse of a pattern.
 ///
@@ -6,13 +7,15 @@ use crate::{DiagDisplay, MatchStream, StreamLike, StreamView};
 pub struct Neg<T>(pub T);
 
 impl<T: MatchStream> MatchStream for Neg<T> {
-    fn match_stream<S>(&self, stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
-        match self.0.match_stream(stream) {
-            Ok(_) => Err(None),
-            Err(_) => Ok(0),
+        let span = stream.peek().map(TokenTree::span).unwrap_or(Span::call_site());
+        if self.0.match_stream(stream).is_err() {
+            Ok(0)
+        } else {
+            Err((None, span))
         }
     }
 }

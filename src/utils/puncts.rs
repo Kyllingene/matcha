@@ -1,5 +1,5 @@
 use crate::procmacro::{Span, TokenTree};
-use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView, MatchResult};
 
 /// A piece of punctuation (e.g. `!`, `.`, `:`).
 ///
@@ -39,17 +39,17 @@ impl FromStream for Punct {
 }
 
 impl MatchStream for Punct {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or(None)?;
+        let tok = stream.peek_or()?;
         if let TokenTree::Punct(p) = tok {
             (p.as_char() == self.ch)
                 .then_some(1)
-                .ok_or_else(|| Some(tok.to_string()))
+                .ok_or_else(|| (Some(tok.to_string()), tok.span()))
         } else {
-            Err(Some(tok.to_string()))
+            Err((Some(tok.to_string()), tok.span()))
         }
     }
 }
@@ -107,7 +107,7 @@ impl core::hash::Hash for Punct {
 /// Helpers for parsing specific [`Punct`]s.
 pub mod punct {
     use crate::procmacro::TokenTree;
-    use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
+    use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView, MatchResult};
 
     macro_rules! impl_punct {
         ($(
@@ -144,15 +144,15 @@ pub mod punct {
             }
 
             impl MatchStream for $name {
-                fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+                fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
                 where
                     S: StreamLike,
                 {
-                    let tok = stream.peek().ok_or(None)?;
+                    let tok = stream.peek_or()?;
                     if let TokenTree::Punct(p) = tok {
-                        (p.as_char() == $p).then_some(1).ok_or_else(|| Some(tok.to_string()))
+                        (p.as_char() == $p).then_some(1).ok_or_else(|| (Some(tok.to_string()), tok.span()))
                     } else {
-                        Err(Some(tok.to_string()))
+                        Err((Some(tok.to_string()), tok.span()))
                     }
                 }
             }

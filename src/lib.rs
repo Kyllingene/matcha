@@ -33,7 +33,7 @@ mod stream;
 mod utils;
 
 pub use error::{Error, ErrorText};
-pub use stream::{DiagDisplay, FromStream, MatchStream, Stream, StreamLike, StreamView};
+pub use stream::{MatchResult, DiagDisplay, FromStream, MatchStream, Stream, StreamLike, StreamView};
 pub use utils::*;
 
 /// Generates a new compile error pointing at the given span.

@@ -1,5 +1,5 @@
 use crate::procmacro::{Delimiter, Span, TokenStream, TokenTree};
-use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView};
+use crate::{DiagDisplay, Error, ErrorText, FromStream, MatchStream, StreamLike, StreamView, MatchResult};
 
 /// The delimiters used by a [`Group`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,18 +162,18 @@ impl FromStream for Group {
 }
 
 impl MatchStream for Group {
-    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> Result<usize, Option<String>>
+    fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
         S: StreamLike,
     {
-        let tok = stream.peek().ok_or(None)?;
+        let tok = stream.peek_or()?;
         if let TokenTree::Group(g) = tok {
             (GroupKind::from(g.delimiter()) == self.kind
                 && g.stream().to_string() == self.inner.to_string())
             .then_some(1)
-            .ok_or_else(|| Some(g.to_string()))
+            .ok_or_else(|| (Some(g.to_string()), g.span()))
         } else {
-            Err(Some(tok.to_string()))
+            Err((Some(tok.to_string()), tok.span()))
         }
     }
 }

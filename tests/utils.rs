@@ -19,7 +19,7 @@ fn main() {
     let g3 = Brackets::from_stream(&mut stream).unwrap();
     assert_eq!(g3.kind, GroupKind::Bracket);
 
-    let mut g2_stream = Stream::from(g2.inner);
+    let mut g2_stream = Stream::from(g2);
     let lits = RepeatAny::<Literal>::from_stream(&mut g2_stream.view()).unwrap();
     assert_eq!(lits, ["1", "2", "3"]);
     let lits = RepeatPlus::<Literal>::from_stream(&mut g2_stream.view()).unwrap();
@@ -29,7 +29,7 @@ fn main() {
     let lits = RepeatRange::<Literal, 0, 2>::from_stream(&mut g2_stream.view()).unwrap();
     assert_eq!(lits, ["1", "2"]);
 
-    let mut g3_stream = Stream::from(g3.inner);
+    let mut g3_stream = Stream::from(g3);
     let lits = RepeatAny::<Literal>::from_stream(&mut g3_stream.view()).unwrap();
     assert_eq!(lits, [""; 0]);
     assert!(RepeatPlus::<Literal>::from_stream(&mut g3_stream.view()).is_err());
@@ -46,8 +46,8 @@ fn main() {
             .unwrap_err()
     );
 
-    assert_eq!(Neg("123").match_stream(stream.view()), Ok(0));
-    let mut inner = Stream::from(Group::from_stream(&mut stream).unwrap().inner);
+    assert_eq!(Neg("123").match_stream(stream.view()).unwrap(), 0);
+    let mut inner = Stream::from(Group::from_stream(&mut stream).unwrap());
 
     let tt = Greedy::<TokenTree>::from_stream(&mut inner).unwrap();
     assert_eq!(tt.to_string(), "foo");
@@ -57,7 +57,7 @@ fn main() {
             ch: ':',
             span: proc_macro2::Span::call_site()
         })
-        .match_stream(stream.view()),
-        Ok(0)
+        .match_stream(stream.view()).unwrap(),
+        0
     );
 }

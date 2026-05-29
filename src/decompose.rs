@@ -167,12 +167,10 @@ macro_rules! __decompose_inner {
                 .map_err(|e| e.with_fatal(cut))?;
         )?
         $(
-            let span = $crate::StreamLike::peek(&mut $input_stream)
-                .map(|tt| tt.span()).unwrap_or($crate::procmacro::Span::call_site());
             let view = $crate::StreamLike::view(&mut $input_stream);
             match <_ as $crate::MatchStream>::match_stream(&$match_expr, view) {
                 Ok(n) => $crate::StreamLike::skip(&mut $input_stream, n),
-                Err(s) => {
+                Err((s, span)) => {
                     return Err($crate::Error::new(
                         $crate::ErrorText::Backticks($crate::DiagDisplay::diag_string(&$match_expr)),
                         match s {
