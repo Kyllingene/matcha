@@ -118,6 +118,9 @@ pub trait StreamLike {
     /// space between each one. This is purely for diagnostic purposes.
     fn stringify(&mut self) -> String;
 
+    /// The span of the last popped token, if any.
+    fn last_span(&self) -> Option<Span>;
+
     /// The span of the closing delimiter for this group.
     ///
     /// If there is no closing delimiter, points to the last token in the
@@ -155,9 +158,11 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
+        let last_span = self.last_span();
         StreamView {
             stream: self,
             skip: 0,
+            last_span,
         }
     }
 
@@ -167,9 +172,11 @@ pub trait StreamLike {
     where
         Self: Sized,
     {
+        let last_span = self.last_span();
         StreamView {
             stream: self,
             skip,
+            last_span,
         }
     }
 }
@@ -202,6 +209,9 @@ impl<S: StreamLike + ?Sized> StreamLike for &mut S {
     fn stringify(&mut self) -> String {
         (**self).stringify()
     }
+    fn last_span(&self) -> Option<Span> {
+        (**self).last_span()
+    }
     fn span_close(&mut self) -> Span {
         (**self).span_close()
     }
@@ -215,18 +225,22 @@ impl<S: StreamLike + ?Sized> StreamLike for &mut S {
     where
         Self: Sized,
     {
+        let last_span = self.last_span();
         StreamView {
             stream: self,
             skip: 0,
+            last_span,
         }
     }
     fn view_from(&mut self, skip: usize) -> StreamView<'_, Self>
     where
         Self: Sized,
     {
+        let last_span = self.last_span();
         StreamView {
             stream: self,
             skip,
+            last_span,
         }
     }
 }
@@ -239,6 +253,7 @@ impl<S: StreamLike + ?Sized> StreamLike for &mut S {
 pub struct Stream {
     iter: crate::procmacro::token_stream::IntoIter,
     buffer: VecDeque<TokenTree>,
+    last_span: Option<Span>,
     span_close: Option<Span>,
 }
 
@@ -247,6 +262,7 @@ impl From<TokenStream> for Stream {
         Self {
             iter: ts.into_iter(),
             buffer: VecDeque::new(),
+            last_span: None,
             span_close: None,
         }
     }
@@ -259,6 +275,7 @@ impl From<crate::Group> for Stream {
         Self {
             iter: group.inner.into_iter(),
             buffer: VecDeque::new(),
+            last_span: None,
             span_close: Some(group.span_close),
         }
     }
@@ -271,6 +288,7 @@ impl From<crate::procmacro::Group> for Stream {
         Self {
             iter: group.stream().into_iter(),
             buffer: VecDeque::new(),
+            last_span: None,
             span_close: Some(group.span_close()),
         }
     }
@@ -342,14 +360,12 @@ impl StreamLike for Stream {
     }
 
     fn pop(&mut self) -> Option<TokenTree> {
-        if let Some(tt) = self.buffer.pop_front() {
-            if self.span_close.is_none() {
-                self.span_close = Some(tt.span());
-            }
-            Some(tt)
-        } else {
-            self.iter.next()
+        let tt = self.buffer.pop_front().or_else(|| self.iter.next())?;
+        if self.span_close.is_none() {
+            self.span_close = Some(tt.span());
         }
+        self.last_span = Some(tt.span());
+        Some(tt)
     }
 
     fn skip(&mut self, n: usize) {
@@ -377,6 +393,10 @@ impl StreamLike for Stream {
         s
     }
 
+    fn last_span(&self) -> Option<Span> {
+        self.last_span
+    }
+
     fn span_close(&mut self) -> Span {
         if self.span_close.is_none() {
             self.span_close = self.peek_last().map(|tt| tt.span());
@@ -399,6 +419,7 @@ impl StreamLike for Stream {
 pub struct StreamView<'a, S> {
     stream: &'a mut S,
     skip: usize,
+    last_span: Option<Span>,
 }
 
 impl<S: StreamLike> StreamView<'_, S> {
@@ -417,6 +438,7 @@ impl<S: StreamLike> StreamLike for StreamView<'_, S> {
     fn pop(&mut self) -> Option<TokenTree> {
         let tt = self.peek()?.clone();
         self.skip(1);
+        self.last_span = Some(tt.span());
         Some(tt)
     }
 
@@ -457,6 +479,10 @@ impl<S: StreamLike> StreamLike for StreamView<'_, S> {
             s.push_str(&tt.to_string());
         }
         s
+    }
+
+    fn last_span(&self) -> Option<Span> {
+        self.last_span
     }
 
     fn span_close(&mut self) -> Span {
