@@ -28,7 +28,7 @@ pub trait FromStream {
     /// downstream and/or upstream code.
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike;
+        S: StreamLike + ?Sized;
 }
 
 /// Test a pattern against a [`StreamView`].
@@ -44,7 +44,7 @@ pub trait MatchStream: DiagDisplay {
     /// at the unexpected data (or end of the stream).
     fn match_stream<S>(&self, stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike;
+        S: StreamLike + ?Sized;
 }
 
 /// Print a [`MatchStream`] pattern out, for use in diagnostics.
@@ -178,6 +178,16 @@ pub trait StreamLike {
             skip,
             last_span,
         }
+    }
+
+    /// Creates a "by reference" adapter for this stream.
+    ///
+    /// The returned adapter also implements `StreamLike`.
+    fn by_ref(&mut self) -> &mut Self
+    where
+        Self: Sized,
+    {
+        self
     }
 }
 
@@ -416,13 +426,13 @@ impl StreamLike for Stream {
 
 /// A view into a [`Stream`] that's allowed to pull into its buffer, but not
 /// allowed to pop elements.
-pub struct StreamView<'a, S> {
+pub struct StreamView<'a, S: ?Sized> {
     stream: &'a mut S,
     skip: usize,
     last_span: Option<Span>,
 }
 
-impl<S: StreamLike> StreamView<'_, S> {
+impl<S: StreamLike + ?Sized> StreamView<'_, S> {
     /// Returns how many tokens have been skipped so far.
     pub fn skipped(&self) -> usize {
         self.skip
@@ -434,7 +444,7 @@ impl<S: StreamLike> StreamView<'_, S> {
     }
 }
 
-impl<S: StreamLike> StreamLike for StreamView<'_, S> {
+impl<S: StreamLike + ?Sized> StreamLike for StreamView<'_, S> {
     fn pop(&mut self) -> Option<TokenTree> {
         let tt = self.peek()?.clone();
         self.skip(1);

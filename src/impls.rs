@@ -7,7 +7,7 @@ where
 {
     fn match_stream<S>(&self, stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         T::match_stream(*self, stream)
     }
@@ -17,7 +17,7 @@ impl FromStream for TokenTree {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         stream.pop().ok_or(stream.err_eos(ErrorText::Token))
     }
@@ -26,7 +26,7 @@ impl FromStream for TokenTree {
 impl MatchStream for TokenTree {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         match (self, stream.peek_or()?) {
             (TokenTree::Group(lhs), TokenTree::Group(rhs)) => (lhs.to_string() == rhs.to_string())
@@ -80,7 +80,7 @@ impl MatchStream for str {
     /// anything, because that's two tokens (`-` and `>`).
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tt = stream.peek_or()?;
         let s = tt.to_string();
@@ -101,7 +101,7 @@ where
     type Output = Option<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         match T::from_stream(stream) {
             Ok(x) => Ok(Some(x)),
@@ -118,7 +118,7 @@ where
     type Output = [T::Output; N];
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut this = [const { None }; N];
         for item in &mut this {
@@ -135,7 +135,7 @@ where
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut vec = Vec::new();
         // Option handles fatal errors for us
@@ -162,7 +162,7 @@ where
 {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut total = 0;
         for item in self {
@@ -191,7 +191,7 @@ where
 {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut total = 0;
         for item in self {
@@ -220,7 +220,7 @@ where
 {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut total = 0;
         for item in self {
@@ -243,7 +243,7 @@ macro_rules! impl_tuple {
 
             fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
             where
-                S: StreamLike,
+                S: StreamLike + ?Sized,
             {
                 Ok(($(
                     $t::from_stream(stream)?,
@@ -270,7 +270,7 @@ macro_rules! impl_tuple {
             #[allow(non_snake_case)]
             fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
             where
-                S: StreamLike,
+                S: StreamLike + ?Sized,
             {
                 let ($($t,)+) = self;
                 let mut total = 0;

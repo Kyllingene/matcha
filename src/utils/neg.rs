@@ -9,7 +9,7 @@ pub struct Neg<T>(pub T);
 impl<T: MatchStream> MatchStream for Neg<T> {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let span = stream.peek().map(TokenTree::span).unwrap_or(Span::call_site());
         if self.0.match_stream(stream).is_err() {

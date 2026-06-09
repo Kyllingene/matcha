@@ -16,7 +16,7 @@ impl<T: FromStream, D: FromStream> FromStream for Delimited<T, D> {
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut items = Vec::new();
         // Option handles fatal errors for us

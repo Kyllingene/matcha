@@ -14,7 +14,7 @@ impl<T: FromStream> FromStream for Greedy<T> {
     )]
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let item = T::from_stream(stream)?;
         if let Some(tt) = stream.peek() {

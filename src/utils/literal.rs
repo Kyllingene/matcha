@@ -13,7 +13,7 @@ impl FromStream for Literal {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = match stream.peek() {
             Some(tt) => tt,
@@ -39,7 +39,7 @@ impl FromStream for Literal {
 impl MatchStream for Literal {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = stream.peek_or()?;
         if let TokenTree::Literal(i) = tok {

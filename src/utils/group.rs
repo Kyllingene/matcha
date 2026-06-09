@@ -137,7 +137,7 @@ impl FromStream for Group {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = match stream.peek() {
             Some(tt) => tt,
@@ -164,7 +164,7 @@ impl FromStream for Group {
 impl MatchStream for Group {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = stream.peek_or()?;
         if let TokenTree::Group(g) = tok {
@@ -201,7 +201,10 @@ pub struct Braces;
 /// A helper for parsing a [`Group`] with [`GroupKind::Bracket`].
 pub struct Brackets;
 
-fn parse_group(kind: GroupKind, stream: &mut impl StreamLike) -> Result<Group, Error> {
+fn parse_group<S>(kind: GroupKind, stream: &mut S) -> Result<Group, Error>
+where
+    S: StreamLike + ?Sized,
+{
     let tok = match stream.peek() {
         Some(tt) => tt,
         None => {
@@ -244,7 +247,7 @@ impl FromStream for Parens {
     type Output = Group;
     fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         parse_group(GroupKind::Paren, stream)
     }
@@ -254,7 +257,7 @@ impl FromStream for Braces {
     type Output = Group;
     fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         parse_group(GroupKind::Brace, stream)
     }
@@ -264,7 +267,7 @@ impl FromStream for Brackets {
     type Output = Group;
     fn from_stream<S>(stream: &mut S) -> Result<Group, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         parse_group(GroupKind::Bracket, stream)
     }

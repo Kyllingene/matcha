@@ -15,7 +15,7 @@ impl FromStream for Punct {
     type Output = Self;
     fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = match stream.peek() {
             Some(tt) => tt,
@@ -41,7 +41,7 @@ impl FromStream for Punct {
 impl MatchStream for Punct {
     fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let tok = stream.peek_or()?;
         if let TokenTree::Punct(p) = tok {
@@ -125,7 +125,7 @@ pub mod punct {
                 type Output = Self;
                 fn from_stream<S>(stream: &mut S) -> Result<Self, Error>
                 where
-                    S: StreamLike,
+                    S: StreamLike + ?Sized,
                 {
                     let tok = match stream.peek() {
                         Some(tt) => tt,
@@ -146,7 +146,7 @@ pub mod punct {
             impl MatchStream for $name {
                 fn match_stream<S>(&self, mut stream: StreamView<'_, S>) -> MatchResult
                 where
-                    S: StreamLike,
+                    S: StreamLike + ?Sized,
                 {
                     let tok = stream.peek_or()?;
                     if let TokenTree::Punct(p) = tok {

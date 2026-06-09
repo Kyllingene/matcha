@@ -116,7 +116,7 @@ macro_rules! __compose_inner {
 
             fn from_stream<S>(mut stream: &mut S) -> core::result::Result<Self, $crate::Error>
             where
-                S: $crate::StreamLike,
+                S: $crate::StreamLike + ?Sized,
             {
                 $crate::decompose! {
                     in stream;
@@ -180,15 +180,15 @@ macro_rules! __compose_inner {
         {
             type Output = Self;
 
-            fn from_stream<S>(stream: &mut S) -> core::result::Result<Self, $crate::Error>
+            fn from_stream<S>(mut stream: &mut S) -> core::result::Result<Self, $crate::Error>
             where
-                S: $crate::StreamLike,
+                S: $crate::StreamLike + ?Sized,
             {
                 // TODO: is there a better way to aggregate errors?
                 let mut err;
             $(
                 $(
-                    let mut view = stream.view();
+                    let mut view = (&mut stream).view();
                     match <$variant_inner as $crate::FromStream>::from_stream(&mut view) {
                         Ok(x) => {
                             let skipped = view.skipped();
@@ -203,7 +203,7 @@ macro_rules! __compose_inner {
                     }
                 )?
                 $(
-                    if let Ok(n) = $crate::MatchStream::match_stream(&$variant_match, stream.view()) {
+                    if let Ok(n) = $crate::MatchStream::match_stream(&$variant_match, (&mut stream).view()) {
                         stream.skip(n);
                         return Ok(Self::$variant_name);
                     }

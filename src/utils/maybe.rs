@@ -9,7 +9,7 @@ pub struct Maybe<T>(pub T);
 impl<T: MatchStream> MatchStream for Maybe<T> {
     fn match_stream<S>(&self, stream: StreamView<'_, S>) -> MatchResult
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         Ok(self.0.match_stream(stream).unwrap_or(0))
     }

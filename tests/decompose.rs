@@ -13,7 +13,7 @@ impl FromStream for Arg {
     type Output = Self;
     fn from_stream<S>(mut stream: &mut S) -> Result<Self, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         decompose! {
             in stream;

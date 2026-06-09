@@ -9,7 +9,7 @@ impl<T: FromStream> FromStream for Cut<T> {
     type Output = T::Output;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         T::from_stream(stream).map_err(Error::fatal)
     }

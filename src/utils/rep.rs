@@ -10,7 +10,7 @@ impl<T: FromStream> FromStream for RepeatPlus<T> {
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut items = vec![T::from_stream(stream)?];
         // Option handles fatal errors for us
@@ -28,7 +28,7 @@ impl<T: FromStream, const N: usize> FromStream for RepeatAtLeast<T, N> {
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut items = Vec::with_capacity(N);
         for _ in 0..N {
@@ -49,7 +49,7 @@ impl<T: FromStream, const N: usize> FromStream for RepeatAtMost<T, N> {
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut items = Vec::new();
         for _ in 0..=N {
@@ -72,7 +72,7 @@ impl<T: FromStream, const N: usize, const M: usize> FromStream for RepeatRange<T
     type Output = Vec<T::Output>;
     fn from_stream<S>(stream: &mut S) -> Result<Self::Output, Error>
     where
-        S: StreamLike,
+        S: StreamLike + ?Sized,
     {
         let mut items = Vec::with_capacity(N);
         for _ in 0..N {
